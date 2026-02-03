@@ -56,9 +56,10 @@ include 'template/sidebar.php';
                         </div>
                         <div class="card-block">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table id="booksTable" class="table table-hover custom-table">
                                     <thead>
                                         <tr>
+                                            <th>No</th>
                                             <th>Kode</th>
                                             <th>Sampul</th>
                                             <th>Judul</th>
@@ -70,8 +71,9 @@ include 'template/sidebar.php';
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach($books as $b): ?>
+                                        <?php $no = 1; foreach($books as $b): ?>
                                         <tr>
+                                            <td><?php echo $no++; ?></td>
                                             <td><?php echo htmlspecialchars($b['code']); ?></td>
                                             <td>
                                                 <?php $coverSrc = !empty($b['cover_path']) ? $b['cover_path'] : $b['cover_url']; ?>
@@ -233,5 +235,16 @@ function previewBook(path) {
 </script>
 
 <?php
+$extra_js = "
+<script>
+$(document).ready(function() {
+    $('#booksTable').DataTable({
+        language: {
+            url: 'assets/lang/datatables-id.json'
+        }
+    });
+});
+</script>
+";
 include 'template/footer.php';
 ?>

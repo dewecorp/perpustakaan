@@ -24,7 +24,7 @@ include 'template/sidebar.php';
                         </div>
                         <div class="card-block">
                             <div class="dt-responsive table-responsive">
-                                <table id="visitorsTable" class="table table-striped table-bordered nowrap">
+                                <table id="visitorsTable" class="table custom-table table-striped table-bordered nowrap">
                                     <thead>
                                         <tr>
                                             <th>No</th>
@@ -56,4 +56,18 @@ include 'template/sidebar.php';
         </div>
     </div>
 </div>
-<?php include 'template/footer.php'; ?>
+<?php 
+$extra_js = "
+<script>
+$(document).ready(function() {
+    $('#visitorsTable').DataTable({
+        language: {
+            url: 'assets/lang/datatables-id.json'
+        },
+        order: [] // Disable initial sorting to respect PHP order
+    });
+});
+</script>
+";
+include 'template/footer.php'; 
+?>

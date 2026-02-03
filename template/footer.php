@@ -27,7 +27,7 @@
 <script src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap4.min.js"></script>
  <script>
      $(document).ready(function() {
-         $('.table').DataTable({
+         $('.table:not(.custom-table)').DataTable({
              language: {
                  url: 'assets/lang/datatables-id.json'
              }
