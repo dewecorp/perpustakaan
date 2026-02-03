@@ -192,8 +192,10 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
     <div class="container position-relative z-index-1 text-center text-white">
       <div class="row justify-content-center">
         <div class="col-lg-8">
-          <h1 class="display-4 font-weight-bold mb-3" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.6);">Temukan Buku Favoritmu</h1>
-          <p class="lead mb-4 opacity-90" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.6);">Akses ribuan koleksi buku digital dan fisik perpustakaan kami dengan mudah. Mulai petualangan literasimu hari ini.</p>
+          <h1 class="display-4 font-weight-bold mb-3" style="text-shadow: 2px 2px 4px rgba(0,0,0,0.6);"><?php echo htmlspecialchars(get_setting('hero_title', 'Temukan Buku Favoritmu')); ?></h1>
+          <div class="lead mb-4 opacity-90" style="text-shadow: 1px 1px 2px rgba(0,0,0,0.6);">
+            <?php echo get_setting('hero_description', 'Akses ribuan koleksi buku digital dan fisik perpustakaan kami dengan mudah. Mulai petualangan literasimu hari ini.'); ?>
+          </div>
           <a href="#katalog" class="btn btn-light btn-lg rounded-pill px-5 text-primary font-weight-bold shadow">Mulai Mencari</a>
         </div>
       </div>

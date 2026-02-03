@@ -54,6 +54,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Handle Hero Text
+    if (isset($_POST['hero_title']) && isset($_POST['hero_description'])) {
+        $heroTitle = trim($_POST['hero_title']);
+        $heroDesc = $_POST['hero_description']; // Don't trim or sanitize yet, let CKEditor handle HTML
+        
+        $savedTitle = save_setting('hero_title', $heroTitle);
+        $savedDesc = save_setting('hero_description', $heroDesc);
+        
+        if ($savedTitle && $savedDesc) {
+             $successMsg .= "Teks Hero berhasil diperbarui. ";
+        } else {
+             $errorMsg .= "Gagal menyimpan teks hero. ";
+        }
+    }
+
     // Handle Login Background Upload
     if (!empty($_FILES["login_bg"]["name"])) {
         $fileName = basename($_FILES["login_bg"]["name"]);
@@ -93,7 +108,7 @@ include 'template/sidebar.php';
                 
                 <div class="page-body">
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <div class="card">
                                 <div class="card-header">
                                     <h5>Informasi Sekolah</h5>
@@ -130,6 +145,19 @@ include 'template/sidebar.php';
                                         </div>
                                         <hr>
                                         <div class="form-group row">
+                                            <label class="col-sm-3 col-form-label">Judul Hero</label>
+                                            <div class="col-sm-9">
+                                                <input type="text" name="hero_title" class="form-control" value="<?php echo htmlspecialchars((string)get_setting('hero_title', 'Temukan Buku Favoritmu')); ?>" placeholder="Masukkan Judul Hero">
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label class="col-sm-3 col-form-label">Deskripsi Hero</label>
+                                            <div class="col-sm-9">
+                                                <textarea name="hero_description" id="hero_description" class="form-control"><?php echo htmlspecialchars((string)get_setting('hero_description', 'Akses ribuan koleksi buku digital dan fisik perpustakaan kami dengan mudah. Mulai petualangan literasimu hari ini.')); ?></textarea>
+                                            </div>
+                                        </div>
+                                        <hr>
+                                        <div class="form-group row">
                                             <label class="col-sm-3 col-form-label">Background Login</label>
                                             <div class="col-sm-9">
                                                 <input type="file" name="login_bg" class="form-control" accept="image/*">
@@ -149,32 +177,15 @@ include 'template/sidebar.php';
                             </div>
                         </div>
                         
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5>Informasi Sistem</h5>
-                                </div>
-                                <div class="card-block">
-                                    <dl class="row">
-                                        <dt class="col-sm-4">Versi PHP</dt>
-                                        <dd class="col-sm-8"><?php echo phpversion(); ?></dd>
-                                        
-                                        <dt class="col-sm-4">Server</dt>
-                                        <dd class="col-sm-8"><?php echo $_SERVER['SERVER_SOFTWARE']; ?></dd>
-                                        
-                                        <dt class="col-sm-4">Database</dt>
-                                        <dd class="col-sm-8">MySQL</dd>
-                                        
-                                        <dt class="col-sm-4">Direktori Upload</dt>
-                                        <dd class="col-sm-8"><code>assets/uploads/</code></dd>
-                                    </dl>
-                                </div>
-                            </div>
-                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+<script>
+    CKEDITOR.replace('hero_description');
+</script>
 <?php include 'template/footer.php'; ?>
