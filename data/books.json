@@ -1,0 +1,47 @@
+[
+  {
+    "id": "BK-001",
+    "title": "Pemrograman Web Modern",
+    "author": "Andi Pratama",
+    "category": "Teknologi",
+    "year": 2024,
+    "cover_url": "https://picsum.photos/seed/bk001/400/600",
+    "description": "Panduan lengkap membangun aplikasi web modern yang responsif dan interaktif."
+  },
+  {
+    "id": "BK-002",
+    "title": "Dasar-Dasar Data Science",
+    "author": "Siti Rahma",
+    "category": "Sains",
+    "year": 2023,
+    "cover_url": "https://picsum.photos/seed/bk002/400/600",
+    "description": "Memahami konsep dasar data science dengan contoh studi kasus."
+  },
+  {
+    "id": "BK-003",
+    "title": "Pengantar Manajemen",
+    "author": "Budi Santoso",
+    "category": "Bisnis",
+    "year": 2022,
+    "cover_url": "https://picsum.photos/seed/bk003/400/600",
+    "description": "Konsep manajemen modern untuk organisasi dan bisnis."
+  },
+  {
+    "id": "BK-004",
+    "title": "Sejarah Nusantara",
+    "author": "Dewi Kartika",
+    "category": "Sejarah",
+    "year": 2021,
+    "cover_url": "https://picsum.photos/seed/bk004/400/600",
+    "description": "Perjalanan panjang sejarah nusantara dari masa ke masa."
+  },
+  {
+    "id": "BK-005",
+    "title": "Desain Antarmuka Pengguna",
+    "author": "Rizky Maulana",
+    "category": "Desain",
+    "year": 2025,
+    "cover_url": "https://picsum.photos/seed/bk005/400/600",
+    "description": "Prinsip-prinsip UI/UX untuk pengalaman pengguna yang baik."
+  }
+]
