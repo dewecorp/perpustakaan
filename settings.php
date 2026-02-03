@@ -100,9 +100,16 @@ include 'template/sidebar.php';
         <div class="main-body">
             <div class="page-wrapper">
                 <div class="page-header card">
-                    <div class="card-block">
-                        <h5 class="m-b-10">Pengaturan Sistem</h5>
-                        <p class="text-muted m-b-10">Atur tampilan dan konfigurasi aplikasi</p>
+                    <div class="row align-items-end">
+                        <div class="col-lg-8">
+                            <div class="page-header-title">
+                                <i class="icofont icofont-settings bg-c-yellow"></i>
+                                <div class="d-inline">
+                                    <h4>Pengaturan Sistem</h4>
+                                    <span>Atur tampilan dan konfigurasi aplikasi</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
