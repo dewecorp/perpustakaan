@@ -107,6 +107,59 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
     .book-author { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
     .badge-group { margin-bottom: 1rem; }
     .filter-card { border-radius: 12px; border: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 2rem; }
+    
+    /* Mobile Hero Adjustment */
+    @media (max-width: 991px) {
+        .hero {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            text-align: center !important;
+            padding: 40px 0 !important;
+            height: auto !important;
+            min-height: 100vh !important; /* Full viewport height for impact */
+        }
+        .hero .container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        .hero .row {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            margin: 0 !important;
+            width: 100% !important;
+        }
+        .hero .col-lg-8 {
+            flex: 0 0 100% !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 20px !important; /* Safe padding for text */
+            margin: 0 !important;
+            text-align: center !important;
+        }
+        .hero h1 {
+            font-size: 2.5rem !important;
+            line-height: 1.2 !important;
+            margin-bottom: 20px !important;
+            text-align: center !important;
+            width: 100% !important;
+        }
+        .hero p.lead {
+            font-size: 1.1rem !important;
+            margin-bottom: 30px !important;
+            text-align: center !important;
+            width: 100% !important;
+        }
+        .hero .btn {
+            display: inline-block !important;
+            margin: 0 auto !important;
+        }
+    }
   </style>
 </head>
 <body>
