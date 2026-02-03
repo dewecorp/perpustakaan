@@ -33,6 +33,29 @@
         .pcoded .pcoded-header .mobile-menu i {
             color: #fff !important;
         }
+        
+        /* Mobile Navbar Fix */
+        @media only screen and (max-width: 992px) {
+            .header-navbar .navbar-wrapper .navbar-logo a:not(.mobile-menu) img {
+                display: inline-block !important;
+            }
+            .header-navbar .navbar-wrapper .navbar-logo a:not(.mobile-menu) {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                width: 100%; /* Ensure it takes full width for centering */
+            }
+            /* Adjust span inside for mobile if needed */
+            .header-navbar .navbar-wrapper .navbar-logo a:not(.mobile-menu) span {
+                display: inline-block !important;
+            }
+            
+            /* Ensure mobile menu button is positioned correctly */
+            .header-navbar .navbar-wrapper .navbar-logo .mobile-menu {
+                z-index: 1001; /* Ensure it's on top */
+            }
+        }
     </style>
 </head>
 <body>

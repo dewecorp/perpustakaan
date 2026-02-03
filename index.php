@@ -113,8 +113,9 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
   <nav class="navbar navbar-expand-lg navbar-dark shadow-sm sticky-top" style="background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);">
     <div class="container">
       <a class="navbar-brand d-flex align-items-center text-white" href="index.php">
-        <img src="assets/images/logo.png?v=<?php echo file_exists('assets/images/logo.png') ? filemtime('assets/images/logo.png') : time(); ?>" alt="Logo" height="40" class="mr-3 bg-white rounded p-1">
-        <span class="font-weight-bold ml-3">PERPUSTAKAAN DIGITAL | <?php echo htmlspecialchars(get_setting('school_name', 'PUSDIGI')); ?></span>
+        <img src="assets/images/logo.png?v=<?php echo file_exists('assets/images/logo.png') ? filemtime('assets/images/logo.png') : time(); ?>" alt="Logo" height="40" class="mr-2 bg-white rounded p-1">
+        <span class="font-weight-bold ml-2 d-none d-md-block">PERPUSTAKAAN DIGITAL | <?php echo htmlspecialchars(get_setting('school_name', 'PUSDIGI')); ?></span>
+        <span class="font-weight-bold ml-2 d-block d-md-none" style="font-size: 1.2rem;">PUSDIGI</span>
       </a>
       <button class="navbar-toggler border-0" type="button" data-toggle="collapse" data-target="#navContent">
         <span class="navbar-toggler-icon"></span>
