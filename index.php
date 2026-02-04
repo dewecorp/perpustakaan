@@ -187,7 +187,7 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
     </div>
   </nav>
 
-  <section class="hero position-relative overflow-hidden d-flex align-items-center" style="min-height: 400px; background: url('assets/images/book-hero.png') no-repeat center center / cover;">
+  <section class="hero position-relative overflow-hidden d-flex align-items-center justify-content-center" style="min-height: 400px; background: url('assets/images/book-hero.png') no-repeat center center / cover;">
     <div class="position-absolute" style="top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6);"></div>
     <div class="container position-relative z-index-1 text-center text-white">
       <div class="row justify-content-center">

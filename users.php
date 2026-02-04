@@ -73,9 +73,11 @@ include 'template/sidebar.php';
                                                     data-toggle="modal" data-target="#editUserModal">
                                                     <i class="ti-pencil"></i> Edit
                                                 </button>
+                                                <?php if($u['id'] != 1): ?>
                                                 <button class="btn btn-danger btn-sm btn-delete" data-id="<?= $u['id'] ?>">
                                                     <i class="ti-trash"></i> Hapus
                                                 </button>
+                                                <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>

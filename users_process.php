@@ -117,6 +117,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 } elseif ($action === 'delete') {
     $id = $_GET['id'];
     
+    // Prevent deleting admin ID 1
+    if ($id == 1) {
+        $_SESSION['error'] = "Akun Admin Utama tidak dapat dihapus.";
+        header('Location: ' . BASE_URL . 'users.php');
+        exit;
+    }
+    
     // Prevent deleting self (simple check)
     // In a real app, we should check logged in user ID
     
