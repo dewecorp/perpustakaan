@@ -191,8 +191,33 @@ include 'template/sidebar.php';
         </div>
     </div>
 </div>
-<script src="https://cdn.ckeditor.com/4.22.1/standard/ckeditor.js"></script>
+<script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script>
 <script>
-    CKEDITOR.replace('hero_description');
+    ClassicEditor
+        .create( document.querySelector( '#hero_description' ), {
+            toolbar: [
+                'undo', 'redo',
+                '|',
+                'heading',
+                '|',
+                'bold', 'italic',
+                '|',
+                'link',
+                'blockQuote',
+                'insertTable',
+                '|',
+                'bulletedList', 'numberedList',
+                '|',
+                'outdent', 'indent'
+            ]
+        } )
+        .catch( error => {
+            console.error( error );
+        } );
 </script>
+<style>
+.ck-editor__editable_inline {
+    min-height: 150px;
+}
+</style>
 <?php include 'template/footer.php'; ?>
