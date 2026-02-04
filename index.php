@@ -60,7 +60,7 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Katalog Buku - PUSDIGI</title>
-  <link rel="icon" href="assets/images/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="assets/images/favicon_library.svg?v=<?php echo time(); ?>" type="image/svg+xml">
   <link rel="stylesheet" type="text/css" href="assets/css/bootstrap/css/bootstrap.min.css">
   <link rel="stylesheet" type="text/css" href="assets/icon/themify-icons/themify-icons.css">
   <link rel="stylesheet" type="text/css" href="assets/icon/icofont/css/icofont.css">

@@ -30,7 +30,8 @@ if (!file_exists($fullPath)) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pratinjau Buku</title>
+  <link rel="icon" href="assets/images/favicon_library.svg?v=<?php echo time(); ?>" type="image/svg+xml">
+  <title>Pratinjau Buku - PUSDIGI</title>
   <style>
     html, body { height: 100%; margin: 0; }
     .container { height: 100%; }
