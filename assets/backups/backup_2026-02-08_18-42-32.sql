@@ -1,5 +1,5 @@
 -- Backup Perpustakaan
--- Date: 2026-02-03 20:12:00
+-- Date: 2026-02-08 18:42:32
 
 SET FOREIGN_KEY_CHECKS=0;
 
@@ -14,16 +14,14 @@ CREATE TABLE `activity_logs` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_created_at` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- Dumping data for table `activity_logs`
-INSERT INTO `activity_logs` VALUES ('1', '1', 'admin', 'update', 'Mengubah kategori: TEKNOLOGI', '2026-02-03 18:46:50');
-INSERT INTO `activity_logs` VALUES ('2', '1', 'admin', 'update', 'Mengubah data buku: Desain Antarmuka Pengguna', '2026-02-03 18:46:58');
-INSERT INTO `activity_logs` VALUES ('3', '1', 'admin', 'update', 'Mengubah data buku: Pengantar Manajemen', '2026-02-03 18:47:06');
-INSERT INTO `activity_logs` VALUES ('4', '1', 'admin', 'update', 'Mengubah data buku: Sejarah Nusantara', '2026-02-03 19:34:28');
-INSERT INTO `activity_logs` VALUES ('5', '1', 'admin', 'update', 'Mengubah data buku: Desain Antarmuka Pengguna', '2026-02-03 19:34:44');
-INSERT INTO `activity_logs` VALUES ('6', '1', 'admin', 'update', 'Mengubah kategori: BUDAYA', '2026-02-03 19:48:49');
-INSERT INTO `activity_logs` VALUES ('7', '1', 'admin', 'create', 'Menambah kategori: KESENIAN', '2026-02-03 19:49:00');
+INSERT INTO `activity_logs` VALUES ('10', '1', 'admin', 'login', 'User logged in', '2026-02-08 18:38:51');
+INSERT INTO `activity_logs` VALUES ('11', '1', 'admin', 'login', 'User logged in', '2026-02-08 18:39:27');
+INSERT INTO `activity_logs` VALUES ('12', '1', 'admin', 'login', 'User logged in', '2026-02-08 18:40:52');
+INSERT INTO `activity_logs` VALUES ('13', '1', 'admin', 'logout', 'User logged out', '2026-02-08 18:41:41');
+INSERT INTO `activity_logs` VALUES ('14', '1', 'admin', 'login', 'User logged in', '2026-02-08 18:41:45');
 
 -- Table structure for table `books`
 DROP TABLE IF EXISTS `books`;
@@ -49,7 +47,7 @@ CREATE TABLE `books` (
 -- Dumping data for table `books`
 INSERT INTO `books` VALUES ('1', 'BK-001', '978-789-456-123', 'Pemrograman Web Modern', 'Andi Pratama', 'TEKNOLOGI', '2024', 'https://picsum.photos/seed/bk001/400/600', NULL, 'assets/uploads/books/book_1770109130_6025.pdf', 'Panduan lengkap membangun aplikasi web modern.', '2026-02-03 13:40:32', '0', '0');
 INSERT INTO `books` VALUES ('2', 'BK-002', '123-123-123-123', 'Dasar-Dasar Data Science', 'Siti Rahma', 'SAINS', '2023', 'https://picsum.photos/seed/bk002/400/600', NULL, 'assets/uploads/books/book_1770110296_4289.pdf', 'Konsep dasar data science dengan studi kasus.', '2026-02-03 13:40:32', '2', '0');
-INSERT INTO `books` VALUES ('3', 'BK-003', '', 'Pengantar Manajemen', 'Budi Santoso', 'SAINS', '2022', 'https://picsum.photos/seed/bk003/400/600', NULL, 'assets/uploads/books/book_1770112675_6751.pdf', 'Konsep manajemen modern untuk organisasi.', '2026-02-03 13:40:32', '5', '0');
+INSERT INTO `books` VALUES ('3', 'BK-003', '', 'Pengantar Manajemen', 'Budi Santoso', 'SAINS', '2022', 'https://picsum.photos/seed/bk003/400/600', NULL, 'assets/uploads/books/book_1770112675_6751.pdf', 'Konsep manajemen modern untuk organisasi.', '2026-02-03 13:40:32', '7', '0');
 INSERT INTO `books` VALUES ('4', 'BK-004', '', 'Sejarah Nusantara', 'Dewi Kartika', 'SEJARAH', '2021', 'https://picsum.photos/seed/bk004/400/600', NULL, 'assets/uploads/books/book_1770122068_6762.pdf', 'Perjalanan sejarah nusantara.', '2026-02-03 13:40:32', '20', '10');
 INSERT INTO `books` VALUES ('5', 'BK-005', '', 'Desain Antarmuka Pengguna', 'Rizky Maulana', 'TEKNOLOGI', '2025', 'https://picsum.photos/seed/bk005/400/600', NULL, 'assets/uploads/books/book_1770122084_4995.pdf', 'Prinsip UI/UX untuk pengalaman pengguna.', '2026-02-03 13:40:32', '3', '0');
 
@@ -114,7 +112,7 @@ CREATE TABLE `visitors` (
   `purpose` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `visit_date` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=46 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Dumping data for table `visitors`
 INSERT INTO `visitors` VALUES ('1', 'admin', 'Melihat Buku: Pemrograman Web Modern', '2026-02-03 16:52:55');
@@ -160,5 +158,7 @@ INSERT INTO `visitors` VALUES ('40', 'admin', 'Melihat Buku: Pengantar Manajemen
 INSERT INTO `visitors` VALUES ('41', 'admin', 'Melihat Buku: Pengantar Manajemen', '2026-02-03 19:57:41');
 INSERT INTO `visitors` VALUES ('42', 'admin', 'Melihat Buku: Sejarah Nusantara', '2026-02-03 19:57:49');
 INSERT INTO `visitors` VALUES ('43', 'admin', 'Melihat Buku: Desain Antarmuka Pengguna', '2026-02-03 19:58:16');
+INSERT INTO `visitors` VALUES ('44', 'admin', 'Melihat Buku: Pengantar Manajemen', '2026-02-04 05:48:56');
+INSERT INTO `visitors` VALUES ('45', 'admin', 'Melihat Buku: Pengantar Manajemen', '2026-02-04 08:35:51');
 
 SET FOREIGN_KEY_CHECKS=1;

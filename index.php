@@ -248,14 +248,24 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                         </div>
                         <p class="text-muted small mb-3 flex-grow-1"><?php echo htmlspecialchars(substr($book['description'], 0, 80)) . (strlen($book['description'])>80?'...':''); ?></p>
                         
-                        <?php if(!empty($book['book_path'])): ?>
+                        <?php
+                            $hasLocalBook  = !empty($book['book_path']);
+                            $hasRemoteBook = !empty($book['book_url']);
+                        ?>
+                        <?php if($hasLocalBook || $hasRemoteBook): ?>
                         <div class="mt-3 pt-3 border-top d-flex justify-content-between">
-                            <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
-                                <i class="ti-eye"></i> Lihat
-                            </button>
-                            <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
-                                <i class="ti-download"></i> Unduh
-                            </a>
+                            <?php if($hasLocalBook): ?>
+                                <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
+                                    <i class="ti-eye"></i> Lihat
+                                </button>
+                                <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
+                                    <i class="ti-download"></i> Unduh
+                                </a>
+                            <?php else: ?>
+                                <a href="<?php echo htmlspecialchars($book['book_url']); ?>" class="btn btn-sm btn-info text-white" target="_blank">
+                                    <i class="ti-eye"></i> Lihat
+                                </a>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -293,14 +303,24 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                         </div>
                         <p class="text-muted small mb-3 flex-grow-1"><?php echo htmlspecialchars(substr($book['description'], 0, 80)) . (strlen($book['description'])>80?'...':''); ?></p>
                         
-                        <?php if(!empty($book['book_path'])): ?>
+                        <?php
+                            $hasLocalBook  = !empty($book['book_path']);
+                            $hasRemoteBook = !empty($book['book_url']);
+                        ?>
+                        <?php if($hasLocalBook || $hasRemoteBook): ?>
                         <div class="mt-3 pt-3 border-top d-flex justify-content-between">
-                            <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
-                                <i class="ti-eye"></i> Lihat
-                            </button>
-                            <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
-                                <i class="ti-download"></i> Unduh
-                            </a>
+                            <?php if($hasLocalBook): ?>
+                                <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
+                                    <i class="ti-eye"></i> Lihat
+                                </button>
+                                <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
+                                    <i class="ti-download"></i> Unduh
+                                </a>
+                            <?php else: ?>
+                                <a href="<?php echo htmlspecialchars($book['book_url']); ?>" class="btn btn-sm btn-info text-white" target="_blank">
+                                    <i class="ti-eye"></i> Lihat
+                                </a>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -378,14 +398,24 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                         </div>
                         <p class="text-muted small mb-3 flex-grow-1"><?php echo htmlspecialchars(substr($book['description'], 0, 100)) . (strlen($book['description'])>100?'...':''); ?></p>
                         
-                        <?php if(!empty($book['book_path'])): ?>
+                        <?php
+                            $hasLocalBook  = !empty($book['book_path']);
+                            $hasRemoteBook = !empty($book['book_url']);
+                        ?>
+                        <?php if($hasLocalBook || $hasRemoteBook): ?>
                         <div class="mt-3 pt-3 border-top d-flex justify-content-between">
-                            <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
-                                <i class="ti-eye"></i> Lihat
-                            </button>
-                            <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
-                                <i class="ti-download"></i> Unduh
-                            </a>
+                            <?php if($hasLocalBook): ?>
+                                <button type="button" class="btn btn-sm btn-info text-white" onclick="previewBook('<?php echo htmlspecialchars($book['book_path']); ?>')">
+                                    <i class="ti-eye"></i> Lihat
+                                </button>
+                                <a href="track_download.php?path=<?php echo urlencode($book['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">
+                                    <i class="ti-download"></i> Unduh
+                                </a>
+                            <?php else: ?>
+                                <a href="<?php echo htmlspecialchars($book['book_url']); ?>" class="btn btn-sm btn-info text-white" target="_blank">
+                                    <i class="ti-eye"></i> Lihat
+                                </a>
+                            <?php endif; ?>
                         </div>
                         <?php endif; ?>
                     </div>

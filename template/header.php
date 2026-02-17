@@ -99,7 +99,7 @@
                                     <i class="ti-angle-down"></i>
                                 </a>
                                 <ul class="show-notification profile-notification">
-                                    <li><a href="auth/logout.php"><i class="ti-layout-sidebar-left"></i> Logout</a></li>
+                                    <li><a href="auth/logout.php" class="logout-link"><i class="ti-layout-sidebar-left"></i> Logout</a></li>
                                 </ul>
                             </li>
                             <?php else: ?>

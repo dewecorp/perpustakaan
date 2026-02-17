@@ -70,7 +70,7 @@
             </li>
 
             <li>
-                <a href="auth/logout.php">
+                <a href="auth/logout.php" class="logout-link">
                     <span class="pcoded-micon"><i class="ti-layout-sidebar-left"></i></span>
                     <span class="pcoded-mtext">Logout</span>
                     <span class="pcoded-mcaret"></span>

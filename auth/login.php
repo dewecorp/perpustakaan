@@ -2,6 +2,7 @@
 require_once '../config/config.php';
 
 $error = '';
+$successMessage = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username'] ?? '');
@@ -19,11 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'username' => $user['username']
             ];
             
-            // Log Activity
             log_activity('login', 'User logged in');
             
-            header('Location: ' . BASE_URL . 'dashboard.php');
-            exit;
+            $displayName = $user['name'] ?? $user['username'];
+            $successMessage = 'Selamat datang, ' . $displayName . '!';
         } else {
             $error = 'Username atau password salah.';
         }
@@ -90,5 +90,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </section>
     <script src="../assets/js/jquery/jquery.min.js"></script>
     <script src="../assets/js/bootstrap/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <?php if ($successMessage): ?>
+    <script>
+    Swal.fire({
+        icon: 'success',
+        title: 'Sukses!',
+        text: '<?php echo $successMessage; ?>',
+        timer: 2000,
+        showConfirmButton: false
+    }).then(function() {
+        window.location.href = '<?php echo BASE_URL; ?>dashboard.php';
+    });
+    </script>
+    <?php endif; ?>
 </body>
 </html>

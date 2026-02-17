@@ -37,6 +37,22 @@
 <!-- SweetAlert2 -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+$(document).on('click', '.logout-link', function(e) {
+    e.preventDefault();
+    var href = $(this).attr('href');
+    Swal.fire({
+        title: 'Konfirmasi Logout',
+        text: 'Anda yakin ingin keluar dari akun?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, logout',
+        cancelButtonText: 'Batal'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            window.location.href = href;
+        }
+    });
+});
 <?php if(isset($_SESSION['success'])): ?>
 Swal.fire({
     icon: 'success',

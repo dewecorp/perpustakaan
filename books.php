@@ -99,9 +99,17 @@ include 'template/sidebar.php';
                                                     <input type="hidden" name="id" value="<?php echo $b['id']; ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="ti-trash"></i></button>
                                                 </form>
-                                                <?php if(!empty($b['book_path'])): ?>
-                                                    <a href="track_download.php?path=<?php echo urlencode($b['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">Unduh</a>
-                                                    <button type="button" class="btn btn-sm btn-outline-info" onclick="previewBook('<?php echo htmlspecialchars($b['book_path']); ?>')">Lihat</button>
+                                                <?php
+                                                    $hasLocalBook  = !empty($b['book_path']);
+                                                    $hasRemoteBook = !empty($b['book_url']);
+                                                ?>
+                                                <?php if($hasLocalBook || $hasRemoteBook): ?>
+                                                    <?php if($hasLocalBook): ?>
+                                                        <a href="track_download.php?path=<?php echo urlencode($b['book_path']); ?>" class="btn btn-sm btn-outline-success" target="_blank">Unduh</a>
+                                                        <button type="button" class="btn btn-sm btn-outline-info" onclick="previewBook('<?php echo htmlspecialchars($b['book_path']); ?>')">Lihat</button>
+                                                    <?php else: ?>
+                                                        <a href="<?php echo htmlspecialchars($b['book_url']); ?>" class="btn btn-sm btn-outline-success" target="_blank">Lihat</a>
+                                                    <?php endif; ?>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -175,6 +183,17 @@ include 'template/sidebar.php';
                             <label>Upload File Buku (PDF)</label>
                             <input type="file" name="book_file" id="book_file" class="form-control" accept="application/pdf">
                         </div>
+                        <div class="col-md-6 form-group">
+                            <label>URL File Buku (opsional)</label>
+                            <input type="url" name="book_url" id="book_url" class="form-control" placeholder="https://drive.google.com/...">
+                        </div>
+                        <div class="col-12 form-group">
+                            <label class="mb-1">
+                                <input type="checkbox" name="use_book_url_only" id="use_book_url_only" value="1" style="margin-right:6px;">
+                                Gunakan hanya URL File Buku dan abaikan file PDF yang diupload
+                            </label>
+                            <small class="text-muted d-block" id="bookSourceHint"></small>
+                        </div>
                         <div class="col-12 form-group">
                             <label>Deskripsi</label>
                             <textarea name="description" id="description" class="form-control" rows="3"></textarea>
@@ -212,6 +231,10 @@ function resetForm() {
     document.getElementById('formAction').value = 'create';
     document.getElementById('bookId').value = '';
     document.getElementById('modalTitle').textContent = 'Tambah Buku';
+    var useUrlOnly = document.getElementById('use_book_url_only');
+    if (useUrlOnly) useUrlOnly.checked = false;
+    var hint = document.getElementById('bookSourceHint');
+    if (hint) hint.textContent = '';
 }
 function editBook(data) {
     document.getElementById('formAction').value = 'update';
@@ -223,7 +246,26 @@ function editBook(data) {
     document.getElementById('category').value = data.category;
     document.getElementById('year').value = data.year;
     document.getElementById('cover_url').value = data.cover_url;
+    document.getElementById('book_url').value = data.book_url || '';
     document.getElementById('description').value = data.description;
+    var hasLocal = !!data.book_path;
+    var hasUrl = !!data.book_url;
+    var useUrlOnly = document.getElementById('use_book_url_only');
+    if (useUrlOnly) {
+        useUrlOnly.checked = !hasLocal && hasUrl;
+    }
+    var hint = document.getElementById('bookSourceHint');
+    if (hint) {
+        var msg = '';
+        if (hasLocal && hasUrl) {
+            msg = 'Saat ini buku memiliki file upload dan URL. Sistem memakai file upload. Centang untuk beralih ke URL saja.';
+        } else if (hasLocal) {
+            msg = 'Saat ini sumber file buku dari upload server.';
+        } else if (hasUrl) {
+            msg = 'Saat ini sumber file buku dari URL.';
+        }
+        hint.textContent = msg;
+    }
     document.getElementById('modalTitle').textContent = 'Ubah Buku';
 }
 function previewBook(path) {

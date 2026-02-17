@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $stmt = $pdo->prepare("INSERT INTO books (code, isbn, title, author, category, year, cover_url, cover_path, book_path, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt = $pdo->prepare("INSERT INTO books (code, isbn, title, author, category, year, cover_url, cover_path, book_path, book_url, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         try {
             $stmt->execute([
                 $_POST['code'],
@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['cover_url'],
                 $coverPath,
                 $bookPath,
+                $_POST['book_url'] ?? '',
                 $_POST['description']
             ]);
             log_activity('create', 'Menambah buku baru: ' . $_POST['title']);
@@ -61,17 +62,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'update') {
         // Fetch existing
-        $stmtGet = $pdo->prepare("SELECT cover_path, book_path FROM books WHERE id=?");
+        $stmtGet = $pdo->prepare("SELECT cover_path, book_path, book_url FROM books WHERE id=?");
         $stmtGet->execute([$_POST['id']]);
         $existing = $stmtGet->fetch();
         $coverPath = $existing['cover_path'] ?? null;
         $bookPath  = $existing['book_path'] ?? null;
+        $bookUrl   = $existing['book_url'] ?? '';
 
-        // Handle uploads
         $coverDir = 'assets/uploads/covers';
         $bookDir  = 'assets/uploads/books';
         if (!is_dir($coverDir)) { mkdir($coverDir, 0777, true); }
         if (!is_dir($bookDir))  { mkdir($bookDir, 0777, true); }
+        $useBookUrlOnly = isset($_POST['use_book_url_only']) && $_POST['use_book_url_only'] === '1';
         if (!empty($_FILES['cover_file']['name'])) {
             $ext = strtolower(pathinfo($_FILES['cover_file']['name'], PATHINFO_EXTENSION));
             $allowedImg = ['jpg','jpeg','png','webp'];
@@ -83,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-        if (!empty($_FILES['book_file']['name'])) {
+        if (!$useBookUrlOnly && !empty($_FILES['book_file']['name'])) {
             $ext = strtolower(pathinfo($_FILES['book_file']['name'], PATHINFO_EXTENSION));
             $allowedDoc = ['pdf'];
             if (in_array($ext, $allowedDoc)) {
@@ -95,7 +97,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $stmt = $pdo->prepare("UPDATE books SET code=?, isbn=?, title=?, author=?, category=?, year=?, cover_url=?, cover_path=?, book_path=?, description=? WHERE id=?");
+        if (isset($_POST['book_url'])) {
+            $bookUrl = $_POST['book_url'];
+        }
+        if ($useBookUrlOnly) {
+            $bookPath = null;
+        }
+
+        $stmt = $pdo->prepare("UPDATE books SET code=?, isbn=?, title=?, author=?, category=?, year=?, cover_url=?, cover_path=?, book_path=?, book_url=?, description=? WHERE id=?");
         try {
             $stmt->execute([
                 $_POST['code'],
@@ -107,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['cover_url'],
                 $coverPath,
                 $bookPath,
+                $bookUrl,
                 $_POST['description'],
                 $_POST['id']
             ]);
