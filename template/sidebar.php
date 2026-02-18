@@ -1,3 +1,4 @@
+<?php $currentRole = isset($_SESSION['user']['role']) ? $_SESSION['user']['role'] : 'admin'; ?>
 <nav class="pcoded-navbar">
     <div class="sidebar_toggle"><a href="#"><i class="icon-close icons"></i></a></div>
     <div class="pcoded-inner-navbar main-menu">
@@ -44,7 +45,7 @@
                     <span class="pcoded-mcaret"></span>
                 </a>
             </li>
-
+            <?php if ($currentRole === 'admin'): ?>
             <li class="<?php echo ($activePage == 'users') ? 'active' : ''; ?>">
                 <a href="users.php">
                     <span class="pcoded-micon"><i class="ti-user"></i></span>
@@ -60,6 +61,7 @@
                     <span class="pcoded-mcaret"></span>
                 </a>
             </li>
+            <?php endif; ?>
 
             <li class="<?php echo ($activePage == 'backup') ? 'active' : ''; ?>">
                 <a href="backup.php">
@@ -69,6 +71,7 @@
                 </a>
             </li>
             
+            <?php if ($currentRole === 'admin'): ?>
             <li class="<?php echo ($activePage == 'sibi_import') ? 'active' : ''; ?>">
                 <a href="sibi_import.php">
                     <span class="pcoded-micon"><i class="ti-import"></i></span>
@@ -76,6 +79,7 @@
                     <span class="pcoded-mcaret"></span>
                 </a>
             </li>
+            <?php endif; ?>
 
             <li>
                 <a href="auth/logout.php" class="logout-link">

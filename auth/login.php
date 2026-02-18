@@ -17,7 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user && password_verify($password, $user['password'])) {
             $_SESSION['user'] = [
                 'id' => $user['id'],
-                'username' => $user['username']
+                'username' => $user['username'],
+                'name' => $user['name'] ?? $user['username'],
+                'role' => $user['role'] ?? 'admin'
             ];
             
             log_activity('login', 'User logged in');

@@ -61,6 +61,19 @@ function require_login() {
   }
 }
 
+function current_user_role(): string {
+  return isset($_SESSION['user']['role']) ? (string)$_SESSION['user']['role'] : 'admin';
+}
+
+function require_admin() {
+  require_login();
+  if (current_user_role() !== 'admin') {
+    http_response_code(403);
+    echo 'Akses ditolak.';
+    exit;
+  }
+}
+
 /**
  * Log user activity
  * @param string $action_type
@@ -130,4 +143,3 @@ function time_ago($datetime) {
     
     return date('d M Y H:i', $time);
 }
-

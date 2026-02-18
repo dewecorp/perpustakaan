@@ -17,4 +17,10 @@ if (!in_array('avatar', $cols)) {
 } else {
     echo "'avatar' column already exists.\n";
 }
+if (!in_array('role', $cols)) {
+    $pdo->exec("ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'");
+    echo "Added 'role' column.\n";
+} else {
+    echo "'role' column already exists.\n";
+}
 echo "Migration complete.\n";

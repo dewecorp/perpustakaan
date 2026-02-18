@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 require_login();
+require_admin();
 
 $pdo = db();
 $pageTitle = "Impor Buku";

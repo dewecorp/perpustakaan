@@ -1,6 +1,7 @@
 <?php
 require_once 'config/config.php';
 require_login();
+require_admin();
 
 $pdo = db();
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
@@ -10,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['username']);
         $password = trim($_POST['password']);
         $name = trim($_POST['name']);
+        $role = $_POST['role'] === 'pustakawan' ? 'pustakawan' : 'admin';
         
         // Check if username exists
         $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ?");
@@ -42,8 +44,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $hash = password_hash($password, PASSWORD_DEFAULT);
         
         try {
-            $stmt = $pdo->prepare("INSERT INTO users (name, username, password, avatar) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$name, $username, $hash, $avatarPath]);
+            $stmt = $pdo->prepare("INSERT INTO users (name, username, password, avatar, role) VALUES (?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $username, $hash, $avatarPath, $role]);
             
             log_activity('create', 'Menambah pengguna baru: ' . $username);
             $_SESSION['success'] = "Pengguna berhasil ditambahkan.";
@@ -56,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = $_POST['id'];
         $username = trim($_POST['username']);
         $name = trim($_POST['name']);
+        $role = $_POST['role'] === 'pustakawan' ? 'pustakawan' : 'admin';
         
         // Check username uniqueness (exclude current user)
         $stmtCheck = $pdo->prepare("SELECT COUNT(*) FROM users WHERE username = ? AND id != ?");
@@ -94,14 +97,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $sql = "UPDATE users SET name = ?, username = ?, avatar = ? WHERE id = ?";
-        $params = [$name, $username, $avatarPath, $id];
+        $sql = "UPDATE users SET name = ?, username = ?, avatar = ?, role = ? WHERE id = ?";
+        $params = [$name, $username, $avatarPath, $role, $id];
 
         // Update password if provided
         if (!empty($_POST['password'])) {
             $hash = password_hash($_POST['password'], PASSWORD_DEFAULT);
-            $sql = "UPDATE users SET name = ?, username = ?, avatar = ?, password = ? WHERE id = ?";
-            $params = [$name, $username, $avatarPath, $hash, $id];
+            $sql = "UPDATE users SET name = ?, username = ?, avatar = ?, password = ?, role = ? WHERE id = ?";
+            $params = [$name, $username, $avatarPath, $hash, $role, $id];
         }
 
         try {

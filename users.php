@@ -1,6 +1,7 @@
 <?php
 require_once 'config/config.php';
 require_login();
+require_admin();
 $pdo = db();
 
 // Fetch users
@@ -44,6 +45,7 @@ include 'template/sidebar.php';
                                             <th>Foto</th>
                                             <th>Nama</th>
                                             <th>Username</th>
+                                            <th>Level</th>
                                             <th>Password</th>
                                             <th>Aksi</th>
                                         </tr>
@@ -64,12 +66,19 @@ include 'template/sidebar.php';
                                             </td>
                                             <td><?= htmlspecialchars($u['name']) ?></td>
                                             <td><?= htmlspecialchars($u['username']) ?></td>
+                                            <td>
+                                                <?php 
+                                                $roleLabel = ($u['role'] ?? 'admin') === 'pustakawan' ? 'Pustakawan' : 'Admin';
+                                                echo htmlspecialchars($roleLabel);
+                                                ?>
+                                            </td>
                                             <td>********</td>
                                             <td>
                                                 <button class="btn btn-warning btn-sm btn-edit" 
                                                     data-id="<?= $u['id'] ?>" 
                                                     data-name="<?= htmlspecialchars($u['name']) ?>"
                                                     data-username="<?= htmlspecialchars($u['username']) ?>"
+                                                    data-role="<?= htmlspecialchars($u['role'] ?? 'admin') ?>"
                                                     data-toggle="modal" data-target="#editUserModal">
                                                     <i class="ti-pencil"></i> Edit
                                                 </button>
@@ -114,6 +123,13 @@ include 'template/sidebar.php';
                         <input type="text" name="username" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label>Level</label>
+                        <select name="role" class="form-control">
+                            <option value="admin">Admin</option>
+                            <option value="pustakawan">Pustakawan</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Password</label>
                         <input type="password" name="password" class="form-control" required>
                     </div>
@@ -155,6 +171,13 @@ include 'template/sidebar.php';
                         <input type="text" name="username" id="edit_username" class="form-control" required>
                     </div>
                     <div class="form-group">
+                        <label>Level</label>
+                        <select name="role" id="edit_role" class="form-control">
+                            <option value="admin">Admin</option>
+                            <option value="pustakawan">Pustakawan</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Password (Kosongkan jika tidak diubah)</label>
                         <input type="password" name="password" class="form-control">
                     </div>
@@ -181,10 +204,12 @@ $(document).ready(function() {
         var id = $(this).data("id");
         var name = $(this).data("name");
         var username = $(this).data("username");
+        var role = $(this).data("role") || "admin";
         
         $("#edit_id").val(id);
         $("#edit_name").val(name);
         $("#edit_username").val(username);
+        $("#edit_role").val(role);
     });
 
     // Delete Button
