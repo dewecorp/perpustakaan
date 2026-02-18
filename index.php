@@ -90,12 +90,12 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
     }
     .book-cover-container {
         height: 240px;
-        overflow: hidden;
         background: #f0f0f0;
         display: flex;
         align-items: center;
         justify-content: center;
         position: relative;
+        overflow: visible;
     }
     .book-cover {
       width: 100%;
@@ -237,11 +237,13 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                             }
                         ?>
                         <img src="<?php echo htmlspecialchars($cover); ?>" class="book-cover" alt="<?php echo htmlspecialchars($book['title']); ?>">
-                        <div class="position-absolute bg-primary text-white px-2 py-1 small rounded-left" style="bottom: 0; right: 0;">
-                            <i class="ti-eye"></i> <?php echo $book['views']; ?>
-                        </div>
                     </div>
                     <div class="card-body d-flex flex-column flex-grow-1">
+                        <div class="d-flex justify-content-end mb-2">
+                            <span class="badge badge-primary bg-primary text-white">
+                                <i class="ti-eye"></i> <?php echo $book['views']; ?>
+                            </span>
+                        </div>
                         <h6 class="book-title"><?php echo htmlspecialchars($book['title']); ?></h6>
                         <p class="book-author mb-2">oleh <?php echo htmlspecialchars($book['author']); ?></p>
                         <div class="badge-group">
@@ -292,11 +294,13 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                             }
                         ?>
                         <img src="<?php echo htmlspecialchars($cover); ?>" class="book-cover" alt="<?php echo htmlspecialchars($book['title']); ?>">
-                        <div class="position-absolute bg-success text-white px-2 py-1 small rounded-left" style="bottom: 0; right: 0;">
-                            <i class="ti-download"></i> <?php echo $book['downloads']; ?>
-                        </div>
                     </div>
                     <div class="card-body d-flex flex-column flex-grow-1">
+                        <div class="d-flex justify-content-end mb-2">
+                            <span class="badge badge-success bg-success text-white">
+                                <i class="ti-download"></i> <?php echo $book['downloads']; ?>
+                            </span>
+                        </div>
                         <h6 class="book-title"><?php echo htmlspecialchars($book['title']); ?></h6>
                         <p class="book-author mb-2">oleh <?php echo htmlspecialchars($book['author']); ?></p>
                         <div class="badge-group">
