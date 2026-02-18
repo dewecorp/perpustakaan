@@ -103,9 +103,10 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
       object-fit: cover;
     }
     .card-body { padding: 1.5rem; }
-    .book-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem; line-height: 1.3; color: #333; }
+    .book-title { font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem; line-height: 1.3; color: #333; word-wrap: break-word; overflow-wrap: break-word; }
     .book-author { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
     .badge-group { margin-bottom: 1rem; }
+    .book-card .card-body p { word-wrap: break-word; overflow-wrap: break-word; }
     .filter-card { border-radius: 12px; border: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 2rem; }
     
     /* Mobile Hero Adjustment */
@@ -435,11 +436,12 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                     $queryParams = $_GET;
                     unset($queryParams['page']);
                     $queryString = http_build_query($queryParams);
+                    $querySuffix = $queryString ? '&' . $queryString : '';
                     ?>
-                    
+ 
                     <!-- Previous -->
                     <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $page - 1; ?>&<?php echo $queryString; ?>" aria-label="Previous">
+                        <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $querySuffix; ?>#katalog" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                             <span class="sr-only">Previous</span>
                         </a>
@@ -448,7 +450,7 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
                     <!-- Page Numbers -->
                     <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                     <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $i; ?>&<?php echo $queryString; ?>">
+                        <a class="page-link" href="?page=<?php echo $i; ?><?php echo $querySuffix; ?>#katalog">
                             <?php echo $i; ?>
                         </a>
                     </li>
@@ -456,7 +458,7 @@ $popDownloads = $pdo->query("SELECT * FROM books ORDER BY downloads DESC LIMIT 4
 
                     <!-- Next -->
                     <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
-                        <a class="page-link" href="?page=<?php echo $page + 1; ?>&<?php echo $queryString; ?>" aria-label="Next">
+                        <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $querySuffix; ?>#katalog" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                             <span class="sr-only">Next</span>
                         </a>

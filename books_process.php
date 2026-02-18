@@ -121,7 +121,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['id']
             ]);
             log_activity('update', 'Mengubah data buku: ' . $_POST['title']);
-            header('Location: ' . BASE_URL . 'books.php?msg=updated');
+            $_SESSION['success'] = "Buku berhasil diubah.";
+            header('Location: ' . BASE_URL . 'books.php');
         } catch (PDOException $e) {
             die("Error: " . $e->getMessage());
         }

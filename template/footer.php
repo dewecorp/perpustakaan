@@ -53,6 +53,22 @@ $(document).on('click', '.logout-link', function(e) {
         }
     });
 });
+$(document).on('submit', '.delete-book-form', function(e) {
+    e.preventDefault();
+    var form = this;
+    Swal.fire({
+        title: 'Konfirmasi Hapus',
+        text: 'Hapus buku ini?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, hapus',
+        cancelButtonText: 'Batal'
+    }).then(function(result) {
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
+});
 <?php if(isset($_SESSION['success'])): ?>
 Swal.fire({
     icon: 'success',

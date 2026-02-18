@@ -94,7 +94,7 @@ include 'template/sidebar.php';
                                                     onclick='editBook(<?php echo json_encode($b); ?>)'>
                                                     <i class="ti-pencil"></i>
                                                 </button>
-                                                <form action="books_process.php" method="POST" style="display:inline" onsubmit="return confirm('Hapus buku ini?');">
+                                                <form action="books_process.php" method="POST" style="display:inline" class="delete-book-form">
                                                     <input type="hidden" name="action" value="delete">
                                                     <input type="hidden" name="id" value="<?php echo $b['id']; ?>">
                                                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="ti-trash"></i></button>
@@ -280,11 +280,21 @@ function previewBook(path) {
 $extra_js = "
 <script>
 $(document).ready(function() {
-    $('#booksTable').DataTable({
+    var table = $('#booksTable').DataTable({
         language: {
             url: 'assets/lang/datatables-id.json'
-        }
+        },
+        columnDefs: [
+            { targets: 0, orderable: false, searchable: false }
+        ],
+        order: [[1, 'asc']]
     });
+
+    table.on('order.dt search.dt draw.dt', function() {
+        table.column(0, { search: 'applied', order: 'applied' }).nodes().each(function(cell, i) {
+            cell.innerHTML = (i + 1);
+        });
+    }).draw();
 });
 </script>
 ";

@@ -68,6 +68,14 @@
                     <span class="pcoded-mcaret"></span>
                 </a>
             </li>
+            
+            <li class="<?php echo ($activePage == 'sibi_import') ? 'active' : ''; ?>">
+                <a href="sibi_import.php">
+                    <span class="pcoded-micon"><i class="ti-import"></i></span>
+                    <span class="pcoded-mtext">Impor Buku</span>
+                    <span class="pcoded-mcaret"></span>
+                </a>
+            </li>
 
             <li>
                 <a href="auth/logout.php" class="logout-link">
