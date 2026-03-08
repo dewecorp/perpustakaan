@@ -66,8 +66,8 @@
                 <div class="navbar-wrapper">
                     <div class="navbar-logo">
                         <a class="mobile-menu" id="mobile-collapse" href="#!"><i class="ti-menu"></i></a>
-                        <a href="index.php">
-                            <img class="img-fluid" src="assets/images/logo.png?v=<?php echo file_exists('assets/images/logo.png') ? filemtime('assets/images/logo.png') : time(); ?>" alt="Theme-Logo" style="max-height: 50px;" />
+                        <a href="<?php echo BASE_URL; ?>index.php">
+                            <img class="img-fluid" src="<?php echo BASE_URL; ?>assets/images/logo.png?v=<?php echo file_exists('assets/images/logo.png') ? filemtime('assets/images/logo.png') : time(); ?>" alt="Theme-Logo" style="max-height: 50px;" />
                             <span style="font-weight: bold; font-size: 20px; margin-left: 10px; vertical-align: middle; display: inline-block;">PUSDIGI</span>
                         </a>
                     </div>

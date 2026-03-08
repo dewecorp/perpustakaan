@@ -7,7 +7,7 @@
         <div class="pcoded-navigatio-lavel" data-i18n="nav.category.navigation">Navigasi</div>
         <ul class="pcoded-item pcoded-left-item">
             <li class="<?php echo ($activePage == 'dashboard') ? 'active' : ''; ?>">
-                <a href="dashboard.php">
+                <a href="<?php echo BASE_URL; ?>dashboard.php">
                     <span class="pcoded-micon"><i class="ti-home"></i></span>
                     <span class="pcoded-mtext">Dashboard</span>
                     <span class="pcoded-mcaret"></span>
@@ -22,14 +22,14 @@
                 </a>
                 <ul class="pcoded-submenu">
                     <li class="<?php echo ($activePage == 'categories') ? 'active' : ''; ?>">
-                        <a href="categories.php">
+                        <a href="<?php echo BASE_URL; ?>categories.php">
                             <span class="pcoded-micon"><i class="ti-angle-right"></i></span>
                             <span class="pcoded-mtext">Kategori Buku</span>
                             <span class="pcoded-mcaret"></span>
                         </a>
                     </li>
                     <li class="<?php echo ($activePage == 'books') ? 'active' : ''; ?>">
-                        <a href="books.php">
+                        <a href="<?php echo BASE_URL; ?>books.php">
                             <span class="pcoded-micon"><i class="ti-angle-right"></i></span>
                             <span class="pcoded-mtext">Data Buku</span>
                             <span class="pcoded-mcaret"></span>
@@ -39,7 +39,7 @@
             </li>
 
             <li class="<?php echo ($activePage == 'visitors') ? 'active' : ''; ?>">
-                <a href="visitors.php">
+                <a href="<?php echo BASE_URL; ?>visitors.php">
                     <span class="pcoded-micon"><i class="ti-id-badge"></i></span>
                     <span class="pcoded-mtext">Data Pengunjung</span>
                     <span class="pcoded-mcaret"></span>
@@ -47,7 +47,7 @@
             </li>
             <?php if ($currentRole === 'admin'): ?>
             <li class="<?php echo ($activePage == 'users') ? 'active' : ''; ?>">
-                <a href="users.php">
+                <a href="<?php echo BASE_URL; ?>users.php">
                     <span class="pcoded-micon"><i class="ti-user"></i></span>
                     <span class="pcoded-mtext">Pengguna</span>
                     <span class="pcoded-mcaret"></span>
@@ -55,7 +55,7 @@
             </li>
 
             <li class="<?php echo ($activePage == 'settings') ? 'active' : ''; ?>">
-                <a href="settings.php">
+                <a href="<?php echo BASE_URL; ?>settings.php">
                     <span class="pcoded-micon"><i class="ti-settings"></i></span>
                     <span class="pcoded-mtext">Pengaturan</span>
                     <span class="pcoded-mcaret"></span>
@@ -64,7 +64,7 @@
             <?php endif; ?>
 
             <li class="<?php echo ($activePage == 'backup') ? 'active' : ''; ?>">
-                <a href="backup.php">
+                <a href="<?php echo BASE_URL; ?>backup.php">
                     <span class="pcoded-micon"><i class="ti-cloud-down"></i></span>
                     <span class="pcoded-mtext">Backup Restore</span>
                     <span class="pcoded-mcaret"></span>
@@ -73,7 +73,7 @@
             
             <?php if ($currentRole === 'admin'): ?>
             <li class="<?php echo ($activePage == 'sibi_import') ? 'active' : ''; ?>">
-                <a href="sibi_import.php">
+                <a href="<?php echo BASE_URL; ?>sibi_import.php">
                     <span class="pcoded-micon"><i class="ti-import"></i></span>
                     <span class="pcoded-mtext">Impor Buku</span>
                     <span class="pcoded-mcaret"></span>
@@ -82,7 +82,7 @@
             <?php endif; ?>
 
             <li>
-                <a href="auth/logout.php" class="logout-link">
+                <a href="<?php echo BASE_URL; ?>auth/logout.php" class="logout-link">
                     <span class="pcoded-micon"><i class="ti-layout-sidebar-left"></i></span>
                     <span class="pcoded-mtext">Logout</span>
                     <span class="pcoded-mcaret"></span>

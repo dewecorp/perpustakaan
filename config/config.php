@@ -13,7 +13,10 @@ $DB_CHARSET = 'utf8mb4';
 // Detect Base URL
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$path = '/perpustakaan/'; 
+$path = '/';
+if ($host === 'localhost' || $host === '127.0.0.1') {
+    $path = '/perpustakaan/';
+}
 define('BASE_URL', $protocol . "://" . $host . $path);
 
 function db() {
