@@ -110,6 +110,17 @@ $pageSubtitle = $pageSubtitle ?? '';
         table.table-compact.dataTable tbody td:not(:first-child):not(:last-child) {
             white-space: nowrap;
         }
+        .user-footer .btn-update-system,
+        .user-footer .logout-link {
+            width: 100%;
+        }
+        .user-footer-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            width: 100%;
+        }
     </style>
 </head>
 <body class="layout-fixed fixed-header sidebar-expand-lg bg-body-tertiary">
@@ -160,7 +171,16 @@ $pageSubtitle = $pageSubtitle ?? '';
                             <p><?php echo htmlspecialchars($displayName); ?></p>
                         </li>
                         <li class="user-footer">
-                            <a href="<?php echo BASE_URL; ?>auth/logout.php" class="btn btn-outline-danger float-end logout-link">Logout</a>
+                            <div class="user-footer-actions">
+                                <?php if (current_user_role() === 'admin'): ?>
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-update-system" id="btnUpdateSystem">
+                                    <i class="bi bi-cloud-download me-1"></i> Update Sistem
+                                </button>
+                                <?php endif; ?>
+                                <a href="<?php echo BASE_URL; ?>auth/logout.php" class="btn btn-outline-danger btn-sm logout-link">
+                                    <i class="bi bi-box-arrow-right me-1"></i> Logout
+                                </a>
+                            </div>
                         </li>
                     </ul>
                 </li>

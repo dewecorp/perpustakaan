@@ -53,6 +53,79 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+$(document).on('click', '#btnUpdateSystem', function(e) {
+    e.preventDefault();
+    Swal.fire({
+        title: 'Update Sistem?',
+        html: 'Sistem akan diperbarui dari <strong>GitHub</strong> (mode ZIP).<br>Upload buku, backup, logo, dan konfigurasi database tetap aman.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, update',
+        cancelButtonText: 'Batal'
+    }).then(function(result) {
+        if (!result.isConfirmed) return;
+
+        var stepTimer;
+        var startTime = Date.now();
+        var steps = [
+            { text: 'Mengunduh paket dari GitHub...', pct: 20 },
+            { text: 'Mengekstrak file update...', pct: 45 },
+            { text: 'Menerapkan pembaruan sistem...', pct: 70 },
+            { text: 'Menyelesaikan proses update...', pct: 90 }
+        ];
+        var stepIdx = 0;
+
+        Swal.fire({
+            title: 'Memproses Update',
+            html: '<p class="mb-3" id="updateStepText">' + steps[0].text + '</p>' +
+                  '<div class="progress" role="progressbar" aria-label="Progress update">' +
+                  '<div class="progress-bar progress-bar-striped progress-bar-animated" id="updateProgressBar" style="width:20%"></div></div>',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: function() {
+                stepTimer = setInterval(function() {
+                    stepIdx++;
+                    if (stepIdx < steps.length) {
+                        document.getElementById('updateStepText').textContent = steps[stepIdx].text;
+                        document.getElementById('updateProgressBar').style.width = steps[stepIdx].pct + '%';
+                    }
+                }, 1200);
+            }
+        });
+
+        fetch('<?php echo BASE_URL; ?>update_system.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            var elapsed = Date.now() - startTime;
+            var wait = Math.max(0, 4500 - elapsed);
+            setTimeout(function() {
+                clearInterval(stepTimer);
+                Swal.close();
+                Swal.fire({
+                    icon: data.success ? 'success' : 'error',
+                    title: data.success ? 'Update Berhasil' : 'Update Gagal',
+                    text: data.message || (data.success ? 'Sistem berhasil diperbarui.' : 'Terjadi kesalahan saat update.'),
+                    confirmButtonText: 'OK'
+                }).then(function() {
+                    if (data.success) window.location.reload();
+                });
+            }, wait);
+        })
+        .catch(function() {
+            clearInterval(stepTimer);
+            Swal.fire({
+                icon: 'error',
+                title: 'Update Gagal',
+                text: 'Tidak dapat menghubungi server update.'
+            });
+        });
+    });
+});
 $(document).on('click', '.logout-link', function(e) {
     e.preventDefault();
     var href = $(this).attr('href');
