@@ -1,0 +1,20 @@
+<?php
+require_once __DIR__ . '/config/config.php';
+require_login();
+require_admin();
+
+header('Content-Type: application/json; charset=utf-8');
+
+$force = isset($_GET['force']) && $_GET['force'] === '1';
+$result = check_github_update($force);
+
+echo json_encode([
+    'success' => $result['error'] === null,
+    'has_update' => $result['has_update'],
+    'installed_sha' => $result['installed_sha'],
+    'latest' => $result['latest'],
+    'checked_at' => $result['checked_at'],
+    'message' => $result['error'] ?? ($result['has_update']
+        ? 'Pembaruan baru tersedia di GitHub.'
+        : 'Sistem Anda sudah menggunakan versi terbaru.'),
+]);

@@ -19,7 +19,9 @@ if (!class_exists('ZipArchive')) {
 const GITHUB_ZIP_URL = 'https://github.com/dewecorp/perpustakaan/archive/refs/heads/main.zip';
 
 $skipFiles = [
-    'config/config.php',
+    'config/database.local.php',
+    'config/database.production.php',
+    'config/database.php',
 ];
 
 $skipDirs = [
@@ -201,6 +203,7 @@ try {
     }
 
     log_activity('update', activity_user_label() . ' memperbarui sistem dari GitHub');
+    mark_github_update_installed();
 
     echo json_encode([
         'success' => true,

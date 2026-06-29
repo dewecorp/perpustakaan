@@ -1,6 +1,10 @@
 <?php
 $lteBase = BASE_URL . 'assets/vendor/admin-lte/';
 $pageSubtitle = $pageSubtitle ?? '';
+$githubUpdate = null;
+if (isset($_SESSION['user']) && current_user_role() === 'admin') {
+    $githubUpdate = check_github_update();
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -121,6 +125,23 @@ $pageSubtitle = $pageSubtitle ?? '';
             padding: 0.75rem;
             width: 100%;
         }
+        .navbar-badge {
+            position: absolute;
+            top: 4px;
+            right: 0;
+            font-size: 0.6rem;
+            padding: 0.2rem 0.35rem;
+        }
+        .nav-item.position-relative > .nav-link {
+            position: relative;
+        }
+        .btn-update-system.has-update-pulse {
+            animation: updatePulse 2s infinite;
+        }
+        @keyframes updatePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.35); }
+            50% { box-shadow: 0 0 0 6px rgba(13, 110, 253, 0); }
+        }
     </style>
 </head>
 <body class="layout-fixed fixed-header sidebar-expand-lg bg-body-tertiary">
@@ -149,6 +170,37 @@ $pageSubtitle = $pageSubtitle ?? '';
                         <i data-lte-icon="minimize" class="bi bi-fullscreen-exit d-none"></i>
                     </a>
                 </li>
+                <?php if (isset($_SESSION['user']) && current_user_role() === 'admin' && !empty($githubUpdate['has_update'])): ?>
+                <li class="nav-item dropdown position-relative">
+                    <a class="nav-link" href="#" data-bs-toggle="dropdown" aria-label="Notifikasi update">
+                        <i class="bi bi-bell"></i>
+                        <span class="badge rounded-pill text-bg-warning navbar-badge">1</span>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0 shadow">
+                        <div class="dropdown-header bg-warning text-dark fw-bold">
+                            <i class="bi bi-cloud-download me-1"></i> Pembaruan Tersedia
+                        </div>
+                        <div class="p-3">
+                            <p class="mb-2 small text-muted mb-1">Versi terpasang: <code><?php echo htmlspecialchars($githubUpdate['installed_sha'] ?: '-'); ?></code></p>
+                            <p class="mb-2 small text-muted mb-1">Versi GitHub: <code><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? '-'); ?></code></p>
+                            <?php if (!empty($githubUpdate['latest']['message'])): ?>
+                            <p class="mb-2 small"><?php echo htmlspecialchars($githubUpdate['latest']['message']); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($githubUpdate['latest']['date'])): ?>
+                            <p class="mb-3 small text-muted"><i class="bi bi-clock me-1"></i><?php echo htmlspecialchars(format_date_id($githubUpdate['latest']['date'], true)); ?></p>
+                            <?php endif; ?>
+                            <button type="button" class="btn btn-primary btn-sm w-100" id="btnUpdateFromNotif">
+                                <i class="bi bi-cloud-download me-1"></i> Update Sekarang
+                            </button>
+                            <?php if (!empty($githubUpdate['latest']['url'])): ?>
+                            <a href="<?php echo htmlspecialchars($githubUpdate['latest']['url']); ?>" class="btn btn-link btn-sm w-100 mt-1" target="_blank" rel="noopener">
+                                Lihat di GitHub
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </li>
+                <?php endif; ?>
                 <?php if (isset($_SESSION['user'])):
                     if (!isset($pdo)) $pdo = db();
                     $stmtHeader = $pdo->prepare("SELECT name, avatar, username FROM users WHERE id = ?");
@@ -172,9 +224,15 @@ $pageSubtitle = $pageSubtitle ?? '';
                         </li>
                         <li class="user-footer">
                             <div class="user-footer-actions">
+                                <a href="<?php echo BASE_URL; ?>auth/lockscreen.php?lock=1" class="btn btn-outline-secondary btn-sm">
+                                    <i class="bi bi-lock me-1"></i> Kunci Layar
+                                </a>
                                 <?php if (current_user_role() === 'admin'): ?>
-                                <button type="button" class="btn btn-outline-primary btn-sm btn-update-system" id="btnUpdateSystem">
+                                <button type="button" class="btn btn-outline-primary btn-sm btn-update-system<?php echo !empty($githubUpdate['has_update']) ? ' has-update-pulse' : ''; ?>" id="btnUpdateSystem">
                                     <i class="bi bi-cloud-download me-1"></i> Update Sistem
+                                    <?php if (!empty($githubUpdate['has_update'])): ?>
+                                    <span class="badge text-bg-warning text-dark ms-1">Baru</span>
+                                    <?php endif; ?>
                                 </button>
                                 <?php endif; ?>
                                 <a href="<?php echo BASE_URL; ?>auth/logout.php" class="btn btn-outline-danger btn-sm logout-link">

@@ -2,11 +2,10 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-$DB_NAME = 'perpustakaan';
-$DB_HOST = '127.0.0.1';
-$DB_USER = 'root';
-$DB_PASS = '';
-$charset = 'utf8mb4';
+require_once __DIR__ . '/database.loader.php';
+load_database_config(__DIR__);
+
+$charset = $DB_CHARSET ?? 'utf8mb4';
 
 try {
   $pdo = new PDO("mysql:host=$DB_HOST;charset=$charset", $DB_USER, $DB_PASS, [

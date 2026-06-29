@@ -4,11 +4,16 @@ error_reporting(E_ALL);
 date_default_timezone_set('Asia/Jakarta');
 session_start();
 
-$DB_NAME = 'perpustakaan';
+// Kredensial database: lokal & hosting terpisah (lihat config/database.loader.php)
 $DB_HOST = '127.0.0.1';
+$DB_NAME = 'perpustakaan';
 $DB_USER = 'root';
 $DB_PASS = '';
 $DB_CHARSET = 'utf8mb4';
+
+require_once __DIR__ . '/database.loader.php';
+load_database_config(__DIR__);
+require_once __DIR__ . '/github_update.php';
 
 // Detect Base URL
 $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
@@ -19,6 +24,91 @@ if ($host === 'localhost' || $host === '127.0.0.1') {
 }
 define('BASE_URL', $protocol . "://" . $host . $path);
 define('BOOK_COVER_PLACEHOLDER', 'assets/images/book-placeholder.svg');
+define('SESSION_IDLE_SECONDS', 2 * 60 * 60);
+
+function touch_session_activity(): void
+{
+    $_SESSION['last_activity'] = time();
+}
+
+function lock_session(): void
+{
+    $_SESSION['locked'] = true;
+}
+
+function unlock_session(): void
+{
+    unset($_SESSION['locked']);
+}
+
+function is_session_locked(): bool
+{
+    return !empty($_SESSION['locked']);
+}
+
+function is_lockscreen_request(): bool
+{
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    return str_ends_with($script, '/auth/lockscreen.php');
+}
+
+function is_public_request(): bool
+{
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
+    $publicScripts = [
+        '/index.php',
+        '/preview_book_viewer.php',
+        '/preview_book_get.php',
+        '/track_book.php',
+        '/track_download.php',
+        '/auth/login.php',
+    ];
+
+    foreach ($publicScripts as $suffix) {
+        if (str_ends_with($script, $suffix)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function is_staff_user(): bool
+{
+    if (empty($_SESSION['user'])) {
+        return false;
+    }
+
+    return in_array(current_user_role(), ['admin', 'pustakawan'], true);
+}
+
+function enforce_session_idle_lock(): void
+{
+    if (!is_staff_user() || is_lockscreen_request() || is_public_request()) {
+        return;
+    }
+
+    $lastActivity = (int)($_SESSION['last_activity'] ?? 0);
+    if ($lastActivity > 0 && (time() - $lastActivity) > SESSION_IDLE_SECONDS) {
+        lock_session();
+    }
+
+    if (is_session_locked()) {
+        $_SESSION['redirect_after_unlock'] = $_SERVER['REQUEST_URI'] ?? (BASE_URL . 'dashboard.php');
+        header('Location: ' . BASE_URL . 'auth/lockscreen.php');
+        exit;
+    }
+
+    touch_session_activity();
+}
+
+function require_login() {
+  if (empty($_SESSION['user'])) {
+    header('Location: ' . BASE_URL . 'auth/login.php');
+    exit;
+  }
+  enforce_session_idle_lock();
+}
 
 function db() {
   static $pdo = null;
@@ -57,13 +147,6 @@ function save_setting($key, $value) {
   $pdo = db();
   $stmt = $pdo->prepare("REPLACE INTO settings (setting_key, setting_value) VALUES (?, ?)");
   return $stmt->execute([$key, $value]);
-}
-
-function require_login() {
-  if (empty($_SESSION['user'])) {
-    header('Location: ' . BASE_URL . 'auth/login.php');
-    exit;
-  }
 }
 
 function current_user_role(): string {

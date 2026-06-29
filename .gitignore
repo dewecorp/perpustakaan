@@ -1,0 +1,4 @@
+# Konfigurasi database per lingkungan — jangan commit kredensial asli
+config/database.local.php
+config/database.production.php
+config/database.php

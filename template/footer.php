@@ -53,11 +53,11 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-$(document).on('click', '#btnUpdateSystem', function(e) {
+$(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif, #btnUpdateDashboard', function(e) {
     e.preventDefault();
     Swal.fire({
         title: 'Update Sistem?',
-        html: 'Sistem akan diperbarui dari <strong>GitHub</strong> (mode ZIP).<br>Upload buku, backup, logo, dan konfigurasi database tetap aman.',
+        html: 'Sistem akan diperbarui dari <strong>GitHub</strong> (mode ZIP).<br>File <code>database.local.php</code> / <code>database.production.php</code>, upload, backup, dan logo tetap aman.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Ya, update',
@@ -160,6 +160,7 @@ Swal.fire({ icon: 'success', title: 'Sukses!', text: <?php echo json_encode($_SE
 <?php if (isset($_SESSION['error'])): ?>
 Swal.fire({ icon: 'error', title: 'Gagal!', text: <?php echo json_encode($_SESSION['error']); ?> });
 <?php unset($_SESSION['error']); endif; ?>
+<?php include __DIR__ . '/idle_lock_script.php'; ?>
 function updateClock() {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };

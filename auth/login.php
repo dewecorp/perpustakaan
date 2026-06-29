@@ -21,6 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'name' => $user['name'] ?? $user['username'],
                 'role' => $user['role'] ?? 'admin'
             ];
+            unlock_session();
+            touch_session_activity();
             log_activity('login', activity_user_label((int)$user['id'], $user['username']) . ' berhasil masuk ke sistem', (int)$user['id']);
             $displayName = $user['name'] ?? $user['username'];
             $successMessage = 'Selamat datang, ' . $displayName . '!';
