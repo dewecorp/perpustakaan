@@ -53,11 +53,10 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-$(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif, #btnUpdateDashboard', function(e) {
+$(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif', function(e) {
     e.preventDefault();
     Swal.fire({
         title: 'Update Sistem?',
-        html: 'Sistem akan diperbarui dari <strong>GitHub</strong> (mode ZIP).<br>File <code>database.local.php</code> / <code>database.production.php</code>, upload, backup, dan logo tetap aman.',
         icon: 'question',
         showCancelButton: true,
         confirmButtonText: 'Ya, update',
@@ -160,6 +159,28 @@ Swal.fire({ icon: 'success', title: 'Sukses!', text: <?php echo json_encode($_SE
 <?php if (isset($_SESSION['error'])): ?>
 Swal.fire({ icon: 'error', title: 'Gagal!', text: <?php echo json_encode($_SESSION['error']); ?> });
 <?php unset($_SESSION['error']); endif; ?>
+<?php if (
+    !empty($githubUpdate['has_update'])
+    && current_user_role() === 'admin'
+    && ($activePage ?? '') === 'dashboard'
+    && empty($_SESSION['github_update_notif_shown'])
+): ?>
+<?php $_SESSION['github_update_notif_shown'] = true; ?>
+Swal.fire({
+    title: 'Pembaruan Sistem Tersedia!',
+    text: 'Versi terbaru tersedia di GitHub. Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.',
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: 'Update Sekarang',
+    cancelButtonText: 'Nanti',
+    confirmButtonColor: '#0d6efd'
+}).then(function(result) {
+    if (result.isConfirmed) {
+        var btn = document.getElementById('btnUpdateSystem');
+        if (btn) btn.click();
+    }
+});
+<?php endif; ?>
 <?php include __DIR__ . '/idle_lock_script.php'; ?>
 function updateClock() {
     const now = new Date();

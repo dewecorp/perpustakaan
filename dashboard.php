@@ -67,23 +67,6 @@ $activePage = 'dashboard';
 include 'template/header.php';
 include 'template/sidebar.php';
 ?>
-<?php if (!empty($githubUpdate['has_update'])): ?>
-<div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
-    <div class="d-flex flex-wrap align-items-center gap-2">
-        <div class="flex-grow-1">
-            <strong><i class="bi bi-bell me-1"></i> Pembaruan sistem tersedia!</strong>
-            Versi GitHub terbaru (<code><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? ''); ?></code>)
-            <?php if (!empty($githubUpdate['latest']['message'])): ?>
-            — <?php echo htmlspecialchars($githubUpdate['latest']['message']); ?>
-            <?php endif; ?>
-        </div>
-        <button type="button" class="btn btn-sm btn-primary" id="btnUpdateDashboard">
-            <i class="bi bi-cloud-download me-1"></i> Update Sekarang
-        </button>
-    </div>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button>
-</div>
-<?php endif; ?>
 <div class="row g-3 mb-4">
     <div class="col-lg-3 col-6">
         <div class="small-box text-bg-primary">

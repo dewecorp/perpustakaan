@@ -181,22 +181,9 @@ if (isset($_SESSION['user']) && current_user_role() === 'admin') {
                             <i class="bi bi-cloud-download me-1"></i> Pembaruan Tersedia
                         </div>
                         <div class="p-3">
-                            <p class="mb-2 small text-muted mb-1">Versi terpasang: <code><?php echo htmlspecialchars($githubUpdate['installed_sha'] ?: '-'); ?></code></p>
-                            <p class="mb-2 small text-muted mb-1">Versi GitHub: <code><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? '-'); ?></code></p>
-                            <?php if (!empty($githubUpdate['latest']['message'])): ?>
-                            <p class="mb-2 small"><?php echo htmlspecialchars($githubUpdate['latest']['message']); ?></p>
-                            <?php endif; ?>
-                            <?php if (!empty($githubUpdate['latest']['date'])): ?>
-                            <p class="mb-3 small text-muted"><i class="bi bi-clock me-1"></i><?php echo htmlspecialchars(format_date_id($githubUpdate['latest']['date'], true)); ?></p>
-                            <?php endif; ?>
                             <button type="button" class="btn btn-primary btn-sm w-100" id="btnUpdateFromNotif">
                                 <i class="bi bi-cloud-download me-1"></i> Update Sekarang
                             </button>
-                            <?php if (!empty($githubUpdate['latest']['url'])): ?>
-                            <a href="<?php echo htmlspecialchars($githubUpdate['latest']['url']); ?>" class="btn btn-link btn-sm w-100 mt-1" target="_blank" rel="noopener">
-                                Lihat di GitHub
-                            </a>
-                            <?php endif; ?>
                         </div>
                     </div>
                 </li>
