@@ -22,7 +22,9 @@ $pageSubtitle = "Tambah, ubah, dan hapus data buku";
 $activePage = 'books';
 $nextBookCode = generate_next_book_code($pdo, (int)date('Y'), 'BK');
 $defaultBookYear = (int)date('Y');
-$pageActions = '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal" onclick="resetForm()"><i class="bi bi-plus-lg me-1"></i> Tambah Buku</button>';
+$pageActions = '<a href="' . BASE_URL . 'books_import.php" class="btn btn-success"><i class="bi bi-upload me-1"></i> Impor dari File</a>'
+    . '<a href="' . BASE_URL . 'books_export.php" class="btn btn-info"><i class="bi bi-download me-1"></i> Ekspor</a>'
+    . '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal" onclick="resetForm()"><i class="bi bi-plus-lg me-1"></i> Tambah Buku</button>';
 
 include 'template/header.php';
 include 'template/sidebar.php';

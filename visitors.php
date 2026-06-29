@@ -75,10 +75,21 @@ $extra_css = "
     .visitors-detail-card {
         margin-top: 0;
     }
+    /* Kolom kanan: beri jarak antar kartu agar tidak menempel */
+    .visitors-side-col > .card + .card {
+        margin-top: 1.5rem;
+    }
+    /* Baris ringkasan & kartu detail tidak menempel */
+    .visitors-detail-card {
+        margin-top: 1.5rem;
+    }
     @media (max-width: 991.98px) {
         .visitors-summary-row {
             row-gap: 1rem;
             margin-bottom: 1.25rem;
+        }
+        .visitors-detail-card {
+            margin-top: 1.25rem;
         }
     }
 </style>
@@ -192,7 +203,7 @@ include 'template/sidebar.php';
             </div>
         </div>
     </div>
-    <div class="col-lg-4">
+    <div class="col-lg-4 visitors-side-col">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title"><i class="bi bi-bar-chart me-1"></i> Buku Paling Diminati</h3>

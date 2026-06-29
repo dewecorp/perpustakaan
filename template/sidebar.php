@@ -106,7 +106,11 @@ $masterOpen = in_array($activePage ?? '', ['categories', 'books']);
             </div>
             <?php if (!empty($pageActions)): ?>
             <div class="row mt-2">
-                <div class="col-12 text-end"><?php echo $pageActions; ?></div>
+                <div class="col-12 text-end">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Aksi halaman">
+                        <?php echo $pageActions; ?>
+                    </div>
+                </div>
             </div>
             <?php endif; ?>
         </div>

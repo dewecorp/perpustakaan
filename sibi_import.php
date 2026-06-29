@@ -800,10 +800,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$results) {
             $httpError = http_get_last_error();
+            $httpInfo = http_get_last_info();
             if ($httpError !== '') {
-                $message = 'Gagal mengambil data dari URL: ' . $httpError . '. Pastikan hosting mengizinkan koneksi HTTPS keluar (curl aktif).';
+                $message = 'Gagal mengambil data dari URL: ' . $httpError
+                    . '<br><small>Info: HTTP ' . ($httpInfo['http_code'] ?? '?')
+                    . ' | engine: ' . ($httpInfo['engine'] ?? '?')
+                    . ' | ssl_verify: ' . ($httpInfo['ssl_verify'] ?? '?') . '</small>'
+                    . '<br>Alternatif: gunakan <b>Ekspor</b> (di lokal) lalu <b>Impor dari File</b> (di hosting).';
             } elseif (!empty($inputUrls)) {
-                $message = 'Tidak ada buku yang berhasil diambil dari URL. Pastikan URL adalah halaman daftar/kategori buku atau halaman detail buku.';
+                $message = 'Tidak ada buku ditemukan pada URL tersebut. Kemungkinan: situs memblokir akses dari server Anda (bukan dari browser), halaman berbeda dari yang diharapkan, atau memuat data lewat JavaScript.'
+                    . '<br><small>Gunakan tombol <b>Tes Koneksi</b> untuk memeriksa apakah server bisa mengakses situs tersebut. Alternatif: <b>Ekspor</b> di lokal, lalu <b>Impor dari File</b> di hosting.</small>';
             } else {
                 $message = 'Masukkan URL terlebih dahulu.';
             }
@@ -861,6 +867,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: ' . BASE_URL . 'books.php');
             exit;
         }
+    } elseif ($action === 'enrich') {
+        // Pengayaan metadata SATU buku lewat AJAX. Dijalankan satu-per-satu dari
+        // browser sehingga UI tetap responsif & bisa dihentikan (tidak freeze).
+        @set_time_limit(60);
+        header('Content-Type: application/json; charset=utf-8');
+        $raw = $_POST['payload'] ?? '';
+        $b = json_decode($raw, true);
+        if (!is_array($b) || empty($b['detail_url'])) {
+            echo json_encode(['ok' => false, 'error' => 'Payload tidak valid']);
+            exit;
+        }
+        $detailUrl = trim((string)$b['detail_url']);
+        $fallback = empty_book_data($detailUrl, $b);
+        $d = parse_detail($detailUrl, $fallback);
+        if (!$d) {
+            // Gagal ambil detail: kembalikan data listing apa adanya agar tetap bisa diimpor.
+            $fallback['detail_url'] = $detailUrl;
+            if (!empty($b['title'])) {
+                $fallback['title'] = trim((string)$b['title']);
+            }
+            echo json_encode(['ok' => false, 'data' => $fallback, 'error' => http_get_last_error()]);
+            exit;
+        }
+        echo json_encode(['ok' => true, 'data' => $d]);
+        exit;
+    } elseif ($action === 'diagnose') {
+        // Tes koneksi keluar untuk membantu mendiagnosis kegagalan di hosting.
+        // Mengembalikan JSON rinci: ketersediaan curl, DNS, SSL, HTTP code, waktu, error.
+        @set_time_limit(60);
+        header('Content-Type: application/json; charset=utf-8');
+        $testUrl = trim($_POST['url'] ?? 'https://cendikia.kemenag.go.id/publik/kategori/1');
+        if (!preg_match('#^https?://#i', $testUrl)) {
+            $testUrl = 'https://cendikia.kemenag.go.id/publik/kategori/1';
+        }
+        $host = (string)(parse_url($testUrl, PHP_URL_HOST) ?? '');
+
+        $report = [
+            'curl_enabled' => function_exists('curl_init'),
+            'curl_version' => function_exists('curl_version') ? (curl_version()['version'] ?? '') : '',
+            'openssl_loaded' => extension_loaded('openssl'),
+            'allow_url_fopen' => (bool)ini_get('allow_url_fopen'),
+            'max_execution_time' => ini_get('max_execution_time'),
+            'target_host' => $host,
+            'dns_resolves' => null,
+            'results' => [],
+        ];
+
+        // Tes DNS (gethostbyname mengembalikan IP string, atau host asli jika gagal).
+        $ip = @gethostbyname($host);
+        $report['dns_resolves'] = ($ip && $ip !== $host) ? $ip : false;
+
+        // Tes dengan curl (beberapa strategi) dan file_get_contents.
+        if (function_exists('curl_init')) {
+            $strategies = [
+                ['label' => 'curl (verifikasi SSL)',   'verify' => true],
+                ['label' => 'curl (tanpa verifikasi)',  'verify' => false],
+            ];
+            foreach ($strategies as $s) {
+                $t0 = microtime(true);
+                $ch = curl_init($testUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_CONNECTTIMEOUT => 8,
+                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36',
+                    CURLOPT_SSL_VERIFYPEER => $s['verify'],
+                    CURLOPT_SSL_VERIFYHOST => $s['verify'] ? 2 : 0,
+                    CURLOPT_ENCODING => '',
+                ]);
+                $body = curl_exec($ch);
+                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $err = curl_error($ch);
+                $errno = curl_errno($ch);
+                curl_close($ch);
+                $report['results'][] = [
+                    'method' => $s['label'],
+                    'http_code' => $code,
+                    'bytes' => is_string($body) ? strlen($body) : 0,
+                    'seconds' => round(microtime(true) - $t0, 2),
+                    'errno' => $errno,
+                    'error' => $err,
+                    'ok' => ($code >= 200 && $code < 400 && is_string($body) && $body !== ''),
+                ];
+            }
+        }
+
+        if ((bool)ini_get('allow_url_fopen')) {
+            $t0 = microtime(true);
+            $ctx = stream_context_create([
+                'http' => ['method' => 'GET', 'timeout' => 12, 'ignore_errors' => true,
+                    'header' => "User-Agent: Mozilla/5.0 Chrome/120\r\n"],
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+            ]);
+            $body = @file_get_contents($testUrl, false, $ctx);
+            $report['results'][] = [
+                'method' => 'file_get_contents',
+                'bytes' => is_string($body) ? strlen($body) : 0,
+                'seconds' => round(microtime(true) - $t0, 2),
+                'error' => (is_string($body) && $body !== '') ? '' : 'Gagal membaca stream',
+                'ok' => is_string($body) && $body !== '',
+            ];
+        }
+
+        $anyOk = false;
+        foreach ($report['results'] as $r) {
+            if (!empty($r['ok'])) { $anyOk = true; break; }
+        }
+        $report['can_reach_target'] = $anyOk;
+
+        echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
     }
 }
 
@@ -900,8 +1019,11 @@ include __DIR__ . '/template/sidebar.php';
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnDiagnose"><i class="bi bi-wrench-adjustable me-1"></i> Tes Koneksi</button>
             </div>
         </form>
+
+        <div class="alert d-none mt-3" id="diagnoseResult" style="white-space:pre-wrap;font-family:monospace;font-size:.85rem;"></div>
 
         <?php if (!empty($results)): ?>
             <h5 class="mb-3">Pratinjau Hasil (<span id="bookCount"><?php echo count($results); ?></span>)</h5>
@@ -946,6 +1068,66 @@ include __DIR__ . '/template/sidebar.php';
     </div>
 </div>
 
+<script>
+(function () {
+    var btn = document.getElementById('btnDiagnose');
+    var box = document.getElementById('diagnoseResult');
+    if (!btn || !box) return;
+    btn.addEventListener('click', function () {
+        var urlInput = document.querySelector('input[name="url"]');
+        var url = urlInput && urlInput.value ? urlInput.value : 'https://cendikia.kemenag.go.id/publik/kategori/1';
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menguji...';
+        box.className = 'alert alert-info mt-3';
+        box.textContent = 'Sedang menguji koneksi ke server tujuan...';
+
+        var body = new URLSearchParams();
+        body.append('action', 'diagnose');
+        body.append('url', url);
+
+        fetch(window.location.href, { method: 'POST', body: body })
+            .then(function (r) { return r.text(); })
+            .then(function (text) {
+                var data;
+                try { data = JSON.parse(text); } catch (e) { data = null; }
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-wrench-adjustable me-1"></i> Tes Koneksi';
+                if (!data) {
+                    box.className = 'alert alert-danger mt-3';
+                    box.textContent = 'Respons server tidak valid (bukan JSON). Kemungkinan PHP diblokir/fatal error:\n\n' + text.slice(0, 1000);
+                    return;
+                }
+                var reach = data.can_reach_target;
+                box.className = 'alert ' + (reach ? 'alert-success' : 'alert-danger') + ' mt-3';
+                var lines = [];
+                lines.push(reach ? '✅ KONEKSI BERHASIL ke ' + (data.target_host || 'server') : '❌ KONEKSI GAGAL ke ' + (data.target_host || 'server'));
+                lines.push('');
+                lines.push('curl tersedia   : ' + (data.curl_enabled ? 'YA' : 'TIDAK') + (data.curl_version ? ' (v' + data.curl_version + ')' : ''));
+                lines.push('openssl         : ' + (data.openssl_loaded ? 'YA' : 'TIDAK'));
+                lines.push('allow_url_fopen : ' + (data.allow_url_fopen ? 'YA' : 'TIDAK'));
+                lines.push('max_exec_time   : ' + data.max_execution_time + 's');
+                lines.push('DNS ' + (data.target_host || '') + ' : ' + (data.dns_resolves ? data.dns_resolves : 'GAGAL resolve'));
+                lines.push('');
+                lines.push('Rincian per metode:');
+                (data.results || []).forEach(function (r) {
+                    var status = r.ok ? '✓' : '✗';
+                    lines.push(status + ' ' + (r.method || '') + ' -> HTTP ' + (r.http_code || '-') + ' | ' + (r.bytes || 0) + ' byte | ' + (r.seconds || '?') + 's' + (r.error ? ' | ' + r.error : ''));
+                });
+                if (!reach) {
+                    lines.push('');
+                    lines.push('Kemungkinan penyebab: hosting memblokir koneksi keluar, IP server Anda diblokir situs tujuan, atau SSL/timeout. Solusi: gunakan fitur Ekspor (di lokal) lalu Impor (di hosting).');
+                }
+                box.textContent = lines.join('\n');
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-wrench-adjustable me-1"></i> Tes Koneksi';
+                box.className = 'alert alert-danger mt-3';
+                box.textContent = 'Gagal menjalankan tes koneksi: ' + err + '\n\nKemungkinan script dibatasi max_execution_time hosting atau dihentikan. Solusi: gunakan fitur Ekspor (lokal) + Impor (hosting).';
+            });
+    });
+})();
+</script>
 <?php
 include __DIR__ . '/template/footer.php';
 ?>
