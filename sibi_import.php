@@ -45,22 +45,15 @@ function http_get($url, array $opts = []) {
     ];
 
     // Urutan percobaan dibuat ramah shared hosting: verifikasi normal dulu,
-    // lalu fallback SSL dan IP resolve. Banyak hosting gagal karena CA bundle
+    // lalu percobaan SSL dan IP resolve. Banyak hosting gagal karena CA bundle
     // lama atau DNS mengarah ke IPv6 yang tidak bisa keluar.
     $attempts = [
         ['verify' => true,  'resolve' => 'default'],
         ['verify' => false, 'resolve' => 'default'],
     ];
-    if (empty($opts['skip_proxy']) && defined('CURL_IPRESOLVE_V4')) {
+    if (defined('CURL_IPRESOLVE_V4')) {
         $attempts[] = ['verify' => true,  'resolve' => 'ipv4'];
         $attempts[] = ['verify' => false, 'resolve' => 'ipv4'];
-    }
-
-    if (empty($opts['skip_proxy']) && import_should_prefer_proxy($url)) {
-        $proxyHtml = http_get_via_import_proxy($url, 'Direct request dilewati untuk host yang sering timeout di shared hosting', []);
-        if ($proxyHtml !== '') {
-            return $proxyHtml;
-        }
     }
 
     if (function_exists('curl_init')) {
@@ -109,13 +102,6 @@ function http_get($url, array $opts = []) {
         }
     }
 
-    if (function_exists('curl_init') && empty($opts['skip_proxy'])) {
-        $proxyHtml = http_get_via_import_proxy($url, $lastHttpError, $lastHttpInfo);
-        if ($proxyHtml !== '') {
-            return $proxyHtml;
-        }
-    }
-
     $headerLines = "User-Agent: {$userAgent}\r\n" . implode("\r\n", $headers);
     foreach ($attempts as $attempt) {
         $context = stream_context_create([
@@ -147,54 +133,7 @@ function http_get($url, array $opts = []) {
         $lastHttpError = 'Gagal mengambil halaman (curl/file_get_contents tidak tersedia atau diblokir hosting)';
     }
 
-    if (empty($opts['skip_proxy'])) {
-        $proxyHtml = http_get_via_import_proxy($url, $lastHttpError, $lastHttpInfo);
-        if ($proxyHtml !== '') {
-            return $proxyHtml;
-        }
-    }
     return '';
-}
-
-function http_get_via_import_proxy(string $url, string $directError, array $directInfo): string {
-    global $lastHttpError, $lastHttpInfo;
-    foreach (import_proxy_urls($url) as $proxyUrl) {
-        $proxyHtml = http_get($proxyUrl, [
-            'skip_proxy' => true,
-            'connect_timeout' => 4,
-            'timeout' => 12,
-        ]);
-        if ($proxyHtml !== '') {
-            $lastHttpInfo = array_merge(http_get_last_info(), [
-                'proxied' => true,
-                'source_url' => $url,
-                'proxy_url' => $proxyUrl,
-                'direct_error' => $directError,
-                'direct_info' => $directInfo,
-            ]);
-            $lastHttpError = '';
-            return $proxyHtml;
-        }
-    }
-    $lastHttpError = $directError . ' | Proxy fallback juga gagal: ' . http_get_last_error();
-    $lastHttpInfo = $directInfo;
-    return '';
-}
-
-function import_proxy_urls(string $url): array {
-    if (!preg_match('#^https?://#i', $url)) {
-        return [];
-    }
-    return [
-        'https://api.allorigins.win/raw?url=' . rawurlencode($url),
-    ];
-}
-
-function import_should_prefer_proxy(string $url): bool {
-    $host = strtolower((string)(parse_url($url, PHP_URL_HOST) ?? ''));
-    return in_array($host, [
-        'cendikia.kemenag.go.id',
-    ], true);
 }
 
 function url_host($url): string {
@@ -251,8 +190,8 @@ function is_book_detail_url($url): bool {
         '#/modul/\d+#i',
         '#/item/\d+#i',
         '#/read/\d+#i',
-        '#/(?:katalog|buku|ebook|modul|baca|read)/[^/?#]+#i',
-        '#/download/[^/?#]+#i',
+        '~/(?:katalog|buku|ebook|modul|baca|read)/[^/?#]+~i',
+        '~/download/[^/?#]+~i',
     ];
     foreach ($detailPatterns as $pattern) {
         if (preg_match($pattern, $url) || preg_match($pattern, $path)) {
@@ -604,7 +543,6 @@ function is_generic_page_title(string $title): bool {
         return true;
     }
     $generic = [
-        'ebook kemenag',
         'ebook',
         'beranda',
         'home',
@@ -778,191 +716,10 @@ $results = [];
 $message = '';
 $debugInfo = '';
 
-function import_json_response(array $payload, int $status = 200): void {
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    http_response_code($status);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    if ($action === 'diagnose') {
-        // Tes koneksi keluar untuk membantu mendiagnosis kegagalan di hosting.
-        // Mengembalikan JSON rinci: ketersediaan curl, DNS, SSL, HTTP code, waktu, error.
-        @set_time_limit(25);
-        $testUrl = trim($_POST['url'] ?? 'https://cendikia.kemenag.go.id/publik/kategori/1');
-        if (!preg_match('#^https?://#i', $testUrl)) {
-            $testUrl = 'https://cendikia.kemenag.go.id/publik/kategori/1';
-        }
-        $host = (string)(parse_url($testUrl, PHP_URL_HOST) ?? '');
-
-        $report = [
-            'curl_enabled' => function_exists('curl_init'),
-            'curl_version' => function_exists('curl_version') ? (curl_version()['version'] ?? '') : '',
-            'openssl_loaded' => extension_loaded('openssl'),
-            'allow_url_fopen' => (bool)ini_get('allow_url_fopen'),
-            'max_execution_time' => ini_get('max_execution_time'),
-            'target_host' => $host,
-            'dns_resolves' => null,
-            'results' => [],
-        ];
-
-        // Tes DNS (gethostbyname mengembalikan IP string, atau host asli jika gagal).
-        $ip = @gethostbyname($host);
-        $report['dns_resolves'] = ($ip && $ip !== $host) ? $ip : false;
-
-        // Tes dengan curl (beberapa strategi) dan file_get_contents.
-        if (function_exists('curl_init')) {
-            $strategies = import_should_prefer_proxy($testUrl)
-                ? [['label' => 'curl direct singkat', 'verify' => false, 'resolve' => 'default']]
-                : [
-                    ['label' => 'curl (verifikasi SSL)',  'verify' => true,  'resolve' => 'default'],
-                    ['label' => 'curl (tanpa verifikasi)', 'verify' => false, 'resolve' => 'default'],
-                ];
-            if (!import_should_prefer_proxy($testUrl) && defined('CURL_IPRESOLVE_V4')) {
-                $strategies[] = ['label' => 'curl IPv4 (verifikasi SSL)',  'verify' => true,  'resolve' => 'ipv4'];
-                $strategies[] = ['label' => 'curl IPv4 (tanpa verifikasi)', 'verify' => false, 'resolve' => 'ipv4'];
-            }
-            foreach ($strategies as $s) {
-                $t0 = microtime(true);
-                $ch = curl_init($testUrl);
-                $curlOpts = [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_FOLLOWLOCATION => true,
-                    CURLOPT_MAXREDIRS => 3,
-                    CURLOPT_CONNECTTIMEOUT => import_should_prefer_proxy($testUrl) ? 2 : 5,
-                    CURLOPT_TIMEOUT => import_should_prefer_proxy($testUrl) ? 3 : 8,
-                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36',
-                    CURLOPT_SSL_VERIFYPEER => $s['verify'],
-                    CURLOPT_SSL_VERIFYHOST => $s['verify'] ? 2 : 0,
-                    CURLOPT_ENCODING => '',
-                    CURLOPT_NOSIGNAL => true,
-                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-                ];
-                if (($s['resolve'] ?? 'default') === 'ipv4' && defined('CURL_IPRESOLVE_V4')) {
-                    $curlOpts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
-                }
-                curl_setopt_array($ch, $curlOpts);
-                $body = curl_exec($ch);
-                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                $effectiveUrl = (string)curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-                $err = curl_error($ch);
-                $errno = curl_errno($ch);
-                curl_close($ch);
-                $report['results'][] = [
-                    'method' => $s['label'],
-                    'http_code' => $code,
-                    'effective_url' => $effectiveUrl !== '' ? $effectiveUrl : $testUrl,
-                    'bytes' => is_string($body) ? strlen($body) : 0,
-                    'seconds' => round(microtime(true) - $t0, 2),
-                    'errno' => $errno,
-                    'error' => $err,
-                    'ok' => ($code >= 200 && $code < 400 && is_string($body) && $body !== ''),
-                ];
-            }
-        }
-
-        if ((bool)ini_get('allow_url_fopen') && !import_should_prefer_proxy($testUrl)) {
-            $t0 = microtime(true);
-            $ctx = stream_context_create([
-                'http' => ['method' => 'GET', 'timeout' => import_should_prefer_proxy($testUrl) ? 3 : 8, 'ignore_errors' => true,
-                    'header' => "User-Agent: Mozilla/5.0 Chrome/120\r\n"],
-                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
-            ]);
-            $body = @file_get_contents($testUrl, false, $ctx);
-            $report['results'][] = [
-                'method' => 'file_get_contents',
-                'bytes' => is_string($body) ? strlen($body) : 0,
-                'seconds' => round(microtime(true) - $t0, 2),
-                'error' => (is_string($body) && $body !== '') ? '' : 'Gagal membaca stream',
-                'ok' => is_string($body) && $body !== '',
-            ];
-        }
-
-        foreach (import_proxy_urls($testUrl) as $proxyUrl) {
-            $t0 = microtime(true);
-            $proxyBody = http_get($proxyUrl, ['skip_proxy' => true, 'connect_timeout' => 3, 'timeout' => 8]);
-            $proxyInfo = http_get_last_info();
-            $report['results'][] = [
-                'method' => 'proxy fallback',
-                'proxy_url' => $proxyUrl,
-                'http_code' => $proxyInfo['http_code'] ?? null,
-                'effective_url' => $proxyInfo['effective_url'] ?? $proxyUrl,
-                'bytes' => is_string($proxyBody) ? strlen($proxyBody) : 0,
-                'seconds' => round(microtime(true) - $t0, 2),
-                'error' => $proxyBody !== '' ? '' : http_get_last_error(),
-                'ok' => $proxyBody !== '',
-            ];
-        }
-
-        $anyOk = false;
-        foreach ($report['results'] as $r) {
-            if (!empty($r['ok'])) { $anyOk = true; break; }
-        }
-        $report['can_reach_target'] = $anyOk;
-
-        import_json_response($report);
-    } elseif ($action === 'fetch_html') {
-        @set_time_limit(30);
-        $sourceUrl = trim($_POST['url'] ?? '');
-        $html = (string)($_POST['fetched_html'] ?? '');
-        $limit = max(1, min(100, intval($_POST['limit'] ?? 20)));
-
-        if (!preg_match('#^https?://#i', $sourceUrl) || trim($html) === '') {
-            $message = 'HTML dari browser kosong. Coba ulangi Tarik via Browser.';
-        } else {
-            if (is_book_detail_url($sourceUrl)) {
-                $book = empty_book_data($sourceUrl, ['read_url' => $sourceUrl]);
-                $title = extract_title_from_html($html);
-                if ($title !== '') {
-                    $book['title'] = $title;
-                }
-                $cover = extract_cover_from_html($html, $sourceUrl);
-                if ($cover !== '') {
-                    $book['cover_url'] = $cover;
-                }
-                extract_file_links_from_html($html, $sourceUrl, $book);
-                enrich_book_metadata($book, $html);
-                if ($book['title'] !== '' && !is_generic_page_title($book['title'])) {
-                    $results[] = $book;
-                }
-            } else {
-                $pageBooks = parse_listing_previews($sourceUrl, $html);
-                if (empty($pageBooks)) {
-                    foreach (parse_listing_links($sourceUrl, $html) as $detailUrl) {
-                        $pageBooks[] = empty_book_data($detailUrl, ['read_url' => $detailUrl]);
-                    }
-                }
-                $seen = [];
-                foreach ($pageBooks as $book) {
-                    $detailUrl = trim((string)($book['detail_url'] ?? ''));
-                    if ($detailUrl === '' || isset($seen[$detailUrl])) {
-                        continue;
-                    }
-                    $seen[$detailUrl] = true;
-                    if (empty($book['read_url'])) {
-                        $book['read_url'] = $detailUrl;
-                    }
-                    $results[] = $book;
-                    if (count($results) >= $limit) {
-                        break;
-                    }
-                }
-            }
-
-            if (!$results) {
-                $message = 'HTML berhasil diterima, tetapi tidak ada buku yang bisa diparse dari halaman tersebut.';
-            }
-        }
-    } elseif ($action === 'fetch') {
-        // Hanya ambil daftar buku dari halaman listing. TIDAK memanggil parse_detail
-        // per-buku di sini (penyebab utama freeze/loading tanpa akhir). Pengayaan
-        // metadata per-buku dilakukan terpisah lewat action=enrich (AJAX bertahap).
-        @set_time_limit(120);
+    if ($action === 'fetch') {
+        @set_time_limit(300);
         $rawInput = trim($_POST['url'] ?? '');
         $limit = max(1, min(500, intval($_POST['limit'] ?? 50)));
         $debug = isset($_GET['debug']) && $_GET['debug'] === '1';
@@ -1003,7 +760,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $previewBooks[] = $b;
         }
 
-        // Dedup & limit — tanpa fetch detail.
+        // Dedup, ambil detail setiap buku, lalu tampilkan hasil final.
         $seen = [];
         foreach ($previewBooks as $preview) {
             $detailUrl = trim((string)($preview['detail_url'] ?? ''));
@@ -1016,7 +773,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($preview['read_url'])) {
                 $preview['read_url'] = $detailUrl;
             }
-            $results[] = $preview;
+            $book = parse_detail($detailUrl, $preview) ?: $preview;
+            if (!empty($book['title']) && !is_generic_page_title($book['title'])) {
+                $results[] = $book;
+            }
             if (count($results) >= $limit) {
                 break;
             }
@@ -1047,31 +807,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'Masukkan URL terlebih dahulu.';
             }
         }
-    } elseif ($action === 'enrich') {
-        // Pengayaan metadata SATU buku lewat AJAX. Dijalankan satu-per-satu dari
-        // browser sehingga UI tetap responsif & bisa dihentikan (tidak freeze).
-        @set_time_limit(60);
-        header('Content-Type: application/json; charset=utf-8');
-        $raw = $_POST['payload'] ?? '';
-        $b = json_decode($raw, true);
-        if (!is_array($b) || empty($b['detail_url'])) {
-            echo json_encode(['ok' => false, 'error' => 'Payload tidak valid']);
-            exit;
-        }
-        $detailUrl = trim((string)$b['detail_url']);
-        $fallback = empty_book_data($detailUrl, $b);
-        $d = parse_detail($detailUrl, $fallback);
-        if (!$d) {
-            // Gagal ambil detail: kembalikan data listing apa adanya agar tetap bisa diimpor.
-            $fallback['detail_url'] = $detailUrl;
-            if (!empty($b['title'])) {
-                $fallback['title'] = trim((string)$b['title']);
-            }
-            echo json_encode(['ok' => false, 'data' => $fallback, 'error' => http_get_last_error()]);
-            exit;
-        }
-        echo json_encode(['ok' => true, 'data' => $d]);
-        exit;
     } elseif ($action === 'import') {
         $payload = json_decode($_POST['payload'] ?? '[]', true);
         if (is_array($payload)) {
@@ -1129,7 +864,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $pageTitle = 'Impor Buku';
-$pageSubtitle = 'Tarik data buku dari berbagai situs ebook (SIBI, Kemdikbud, madrasah, dan lainnya)';
+$pageSubtitle = 'Tarik data buku dari URL SIBI';
 $activePage = 'sibi_import';
 include __DIR__ . '/template/header.php';
 include __DIR__ . '/template/sidebar.php';
@@ -1150,9 +885,9 @@ include __DIR__ . '/template/sidebar.php';
             <input type="hidden" name="action" value="fetch">
             <div class="mb-3">
                 <label class="form-label">URL Sumber Buku</label>
-                <input type="text" name="url" class="form-control" placeholder="Contoh: https://cendikia.kemenag.go.id/publik/kategori/1" value="<?php echo htmlspecialchars($_POST['url'] ?? ''); ?>">
+                <input type="text" name="url" class="form-control" placeholder="Contoh: https://buku.kemdikbud.go.id/katalog" value="<?php echo htmlspecialchars($_POST['url'] ?? ''); ?>">
                 <small class="text-muted">
-                    Bisa: <b>URL kategori/daftar buku</b> (mis. <code>/kategori/1</code>), <b>URL detail satu buku</b>, atau <b>beberapa URL sekaligus</b> (dipisah baris/spasi).
+                    Bisa: <b>URL kategori/daftar buku SIBI</b>, <b>URL detail satu buku</b>, atau <b>beberapa URL sekaligus</b> (dipisah baris/spasi).
                     Sistem mendeteksi jenisnya otomatis. Untuk URL kategori, buku di halaman berikutnya ikut diambil.
                 </small>
             </div>
@@ -1164,55 +899,11 @@ include __DIR__ . '/template/sidebar.php';
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
-                <button type="button" class="btn btn-outline-primary" id="btnBrowserFetch"><i class="bi bi-browser-chrome me-1"></i> Tarik via Browser</button>
-                <button type="button" class="btn btn-outline-success" id="btnPasteHtml"><i class="bi bi-code-square me-1"></i> Tempel HTML</button>
-                <button type="button" class="btn btn-outline-secondary" id="btnDiagnoseImport"><i class="bi bi-wifi me-1"></i> Tes Koneksi Hosting</button>
-            </div>
-            <div class="alert alert-secondary mt-3 d-none" id="diagnoseResult">
-                <pre class="mb-0 small" style="white-space: pre-wrap;"></pre>
             </div>
         </form>
-
-        <form method="POST" class="d-none" id="browserFetchForm">
-            <input type="hidden" name="action" value="fetch_html">
-            <input type="hidden" name="url" id="browserFetchUrl">
-            <input type="hidden" name="limit" id="browserFetchLimit">
-            <textarea name="fetched_html" id="browserFetchHtml"></textarea>
-        </form>
-
-        <div class="card border-success d-none mb-4" id="pasteHtmlPanel">
-            <div class="card-header bg-success-subtle">
-                <h3 class="card-title mb-0">Import dari HTML Halaman</h3>
-            </div>
-            <div class="card-body">
-                <p class="text-muted small mb-2">
-                    Buka URL sumber di tab baru, tekan Ctrl+U, salin semua HTML, lalu tempel di sini.
-                </p>
-                <form method="POST">
-                    <input type="hidden" name="action" value="fetch_html">
-                    <input type="hidden" name="url" id="pasteHtmlUrl">
-                    <input type="hidden" name="limit" id="pasteHtmlLimit">
-                    <textarea name="fetched_html" class="form-control font-monospace" rows="8" placeholder="Tempel source HTML halaman sumber di sini"></textarea>
-                    <div class="mt-2 d-flex gap-2">
-                        <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Proses HTML</button>
-                        <button type="button" class="btn btn-outline-secondary" id="btnCancelPasteHtml">Batal</button>
-                    </div>
-                </form>
-            </div>
-        </div>
 
         <?php if (!empty($results)): ?>
-            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
-                <h5 class="mb-0">Pratinjau Hasil (<span id="bookCount"><?php echo count($results); ?></span>)</h5>
-                <div class="d-flex gap-2">
-                    <button type="button" class="btn btn-info" id="btnEnrich"><i class="bi bi-magic me-1"></i> Lengkapi Detail</button>
-                    <button type="button" class="btn btn-warning d-none" id="btnStopEnrich"><i class="bi bi-stop-circle me-1"></i> Stop</button>
-                </div>
-            </div>
-
-            <div class="progress mb-3 d-none" id="enrichProgressWrap" style="height: 22px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" id="enrichProgressBar" role="progressbar" style="width:0%;">0%</div>
-            </div>
+            <h5 class="mb-3">Pratinjau Hasil (<span id="bookCount"><?php echo count($results); ?></span>)</h5>
 
             <div class="table-responsive">
                 <table class="table table-striped" id="previewTable">
@@ -1225,7 +916,6 @@ include __DIR__ . '/template/sidebar.php';
                             <th>Jenjang</th>
                             <th>Tahun</th>
                             <th>Sampul</th>
-                            <th>Status</th>
                             <th>Lihat</th>
                         </tr>
                     </thead>
@@ -1239,7 +929,6 @@ include __DIR__ . '/template/sidebar.php';
                                 <td class="cell-jenjang"><?php echo htmlspecialchars($r['jenjang'] ?: '—'); ?></td>
                                 <td class="cell-year"><?php echo htmlspecialchars($r['year'] ?: '—'); ?></td>
                                 <td class="cell-cover"><?php if (!empty($r['cover_url'])): ?><img src="<?php echo htmlspecialchars($r['cover_url']); ?>" style="height:48px"><?php endif; ?></td>
-                                <td class="cell-status"><span class="badge text-bg-secondary">menunggu</span></td>
                                 <td><a href="<?php echo htmlspecialchars($r['read_url'] ?: $r['detail_url']); ?>" target="_blank" class="btn btn-sm btn-outline-info">Lihat</a></td>
                             </tr>
                         <?php endforeach; ?>
@@ -1256,228 +945,6 @@ include __DIR__ . '/template/sidebar.php';
     </div>
 </div>
 
-<script>
-(function () {
-    var ENRICH_DATA = <?php echo json_encode($results, JSON_UNESCAPED_SLASHES); ?>;
-    var enriching = false;
-    var stopRequested = false;
-
-    function $(sel, ctx) { return (ctx || document).querySelector(sel); }
-    function setRowStatus(row, text, cls) {
-        var cell = row.querySelector('.cell-status');
-        if (!cell) return;
-        cell.innerHTML = '<span class="badge ' + (cls || 'text-bg-secondary') + '">' + text + '</span>';
-    }
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-    function updateRow(index, d) {
-        var row = $('#previewBody tr[data-index="' + index + '"]');
-        if (!row) return;
-        if (d.title)   row.querySelector('.cell-title').textContent   = d.title;
-        if (d.author)  row.querySelector('.cell-author').textContent  = d.author;
-        if (d.isbn)    row.querySelector('.cell-isbn').textContent    = d.isbn;
-        if (d.jenjang) row.querySelector('.cell-jenjang').textContent = d.jenjang;
-        if (d.year)    row.querySelector('.cell-year').textContent    = d.year;
-        if (d.cover_url) row.querySelector('.cell-cover').innerHTML = '<img src="' + esc(d.cover_url) + '" style="height:48px">';
-        // Simpan data terbaru ke ENRICH_DATA supaya ikut ter-impor.
-        ENRICH_DATA[index] = Object.assign({}, ENRICH_DATA[index] || {}, d);
-    }
-    function syncPayload() {
-        $('#importPayload').value = JSON.stringify(ENRICH_DATA);
-    }
-
-    function browserProxyUrls(url) {
-        return [
-            'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
-            'https://corsproxy.io/?' + encodeURIComponent(url),
-            'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
-        ];
-    }
-
-    function fillPasteHtmlDefaults() {
-        var urlInput = document.querySelector('input[name="url"]');
-        var limitInput = document.querySelector('input[name="limit"]');
-        $('#pasteHtmlUrl').value = urlInput ? urlInput.value.trim() : '';
-        $('#pasteHtmlLimit').value = limitInput ? limitInput.value : '20';
-    }
-
-    $('#btnPasteHtml') && $('#btnPasteHtml').addEventListener('click', function () {
-        fillPasteHtmlDefaults();
-        $('#pasteHtmlPanel').classList.remove('d-none');
-        var textarea = $('#pasteHtmlPanel textarea[name="fetched_html"]');
-        if (textarea) textarea.focus();
-    });
-
-    $('#btnCancelPasteHtml') && $('#btnCancelPasteHtml').addEventListener('click', function () {
-        $('#pasteHtmlPanel').classList.add('d-none');
-    });
-
-    $('#btnBrowserFetch') && $('#btnBrowserFetch').addEventListener('click', function () {
-        var btn = this;
-        var urlInput = document.querySelector('input[name="url"]');
-        var limitInput = document.querySelector('input[name="limit"]');
-        var url = urlInput ? urlInput.value.trim() : '';
-        var box = $('#diagnoseResult');
-        var pre = box ? box.querySelector('pre') : null;
-
-        if (!/^https?:\/\//i.test(url)) {
-            if (box && pre) {
-                box.classList.remove('d-none');
-                pre.textContent = 'Masukkan URL sumber buku yang valid terlebih dahulu.';
-            }
-            return;
-        }
-
-        btn.disabled = true;
-        if (box && pre) {
-            box.classList.remove('d-none');
-            pre.textContent = 'Browser sedang mengambil HTML sumber...';
-        }
-
-        var proxies = browserProxyUrls(url);
-        var lastError = '';
-
-        function tryProxy(i) {
-            if (i >= proxies.length) {
-                throw new Error(lastError || 'Semua proxy browser gagal.');
-            }
-            return fetch(proxies[i], { method: 'GET' })
-                .then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status + ' dari proxy browser');
-                    return r.text();
-                })
-                .then(function (html) {
-                    if (!html || html.length < 200) throw new Error('HTML terlalu pendek dari proxy browser');
-                    return html;
-                })
-                .catch(function (err) {
-                    lastError = err && err.message ? err.message : String(err);
-                    return tryProxy(i + 1);
-                });
-        }
-
-        tryProxy(0)
-            .then(function (html) {
-                $('#browserFetchUrl').value = url;
-                $('#browserFetchLimit').value = limitInput ? limitInput.value : '20';
-                $('#browserFetchHtml').value = html;
-                if (pre) pre.textContent = 'HTML berhasil diambil oleh browser. Memproses daftar buku...';
-                $('#browserFetchForm').submit();
-            })
-            .catch(function (err) {
-                fillPasteHtmlDefaults();
-                $('#pasteHtmlPanel').classList.remove('d-none');
-                if (pre) pre.textContent = 'Tarik via Browser gagal: ' + (err && err.message ? err.message : err) + '\n\nFallback: buka URL sumber di tab baru, tekan Ctrl+U, salin semua HTML, lalu tempel di panel "Import dari HTML Halaman".';
-                btn.disabled = false;
-            });
-    });
-
-    $('#btnDiagnoseImport') && $('#btnDiagnoseImport').addEventListener('click', function () {
-        var btn = this;
-        var urlInput = document.querySelector('input[name="url"]');
-        var box = $('#diagnoseResult');
-        var pre = box ? box.querySelector('pre') : null;
-        var body = new URLSearchParams();
-        body.append('action', 'diagnose');
-        body.append('url', urlInput ? urlInput.value : '');
-
-        btn.disabled = true;
-        if (box && pre) {
-            box.classList.remove('d-none');
-            pre.textContent = 'Menguji koneksi...';
-        }
-
-        fetch(window.location.href, {
-            method: 'POST',
-            body: body,
-            credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-            .then(function (r) {
-                return r.text().then(function (text) {
-                    try {
-                        return JSON.parse(text);
-                    } catch (e) {
-                        throw new Error('Server membalas HTML/teks, bukan JSON:\n' + text.slice(0, 1200));
-                    }
-                });
-            })
-            .then(function (res) {
-                if (pre) pre.textContent = JSON.stringify(res, null, 2);
-            })
-            .catch(function (err) {
-                if (pre) pre.textContent = 'Tes koneksi gagal dijalankan: ' + (err && err.message ? err.message : err);
-            })
-            .finally(function () {
-                btn.disabled = false;
-            });
-    });
-
-    function enrichOne(index) {
-        if (stopRequested || index >= ENRICH_DATA.length) {
-            finishEnrich();
-            return;
-        }
-        var row = $('#previewBody tr[data-index="' + index + '"]');
-        if (row) setRowStatus(row, 'memproses', 'text-bg-info');
-        updateProgress(index);
-
-        var body = new URLSearchParams();
-        body.append('action', 'enrich');
-        body.append('payload', JSON.stringify(ENRICH_DATA[index]));
-
-        fetch(window.location.href, { method: 'POST', body: body })
-            .then(function (r) { return r.json(); })
-            .then(function (res) {
-                if (res && res.data) updateRow(index, res.data);
-                if (row) setRowStatus(row, (res && res.ok) ? 'lengkap' : 'minimum', (res && res.ok) ? 'text-bg-success' : 'text-bg-warning');
-                syncPayload();
-                enrichOne(index + 1);
-            })
-            .catch(function () {
-                if (row) setRowStatus(row, 'gagal', 'text-bg-danger');
-                enrichOne(index + 1);
-            });
-    }
-
-    function updateProgress(index) {
-        var total = ENRICH_DATA.length;
-        var done = index;
-        var pct = Math.round((done / total) * 100);
-        $('#enrichProgressBar').style.width = pct + '%';
-        $('#enrichProgressBar').textContent = pct + '%';
-    }
-
-    function finishEnrich() {
-        enriching = false;
-        $('#btnEnrich').disabled = false;
-        $('#btnStopEnrich').classList.add('d-none');
-        $('#enrichProgressBar').classList.remove('progress-bar-animated');
-        $('#enrichProgressBar').style.width = '100%';
-        $('#enrichProgressBar').textContent = '100%';
-        syncPayload();
-    }
-
-    $('#btnEnrich') && $('#btnEnrich').addEventListener('click', function () {
-        if (enriching || ENRICH_DATA.length === 0) return;
-        enriching = true;
-        stopRequested = false;
-        this.disabled = true;
-        $('#btnStopEnrich').classList.remove('d-none');
-        $('#enrichProgressWrap').classList.remove('d-none');
-        $('#enrichProgressBar').classList.add('progress-bar-animated');
-        enrichOne(0);
-    });
-
-    $('#btnStopEnrich') && $('#btnStopEnrich').addEventListener('click', function () {
-        stopRequested = true;
-        this.disabled = true;
-    });
-})();
-</script>
 <?php
 include __DIR__ . '/template/footer.php';
 ?>
