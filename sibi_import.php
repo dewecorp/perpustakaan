@@ -30,9 +30,9 @@ function http_get($url, array $opts = []) {
         return '';
     }
 
-    // Default lebih agresif: koneksi cepat gagal (10s) & total 25s supaya request
+    // Default lebih agresif: koneksi cepat gagal (8s) & total 25s supaya request
     // tidak menggantung menahan seluruh halaman (penyebab "freeze" / loading tanpa akhir).
-    $connectTimeout = (int)($opts['connect_timeout'] ?? 10);
+    $connectTimeout = (int)($opts['connect_timeout'] ?? 8);
     $totalTimeout = (int)($opts['timeout'] ?? 25);
 
     $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -44,13 +44,17 @@ function http_get($url, array $opts = []) {
         'Referer: ' . preg_replace('#\?.*$#', '', $url),
     ];
 
-    // Urutan percobaan: native (verify on) -> lewat proxy tanpa verifikasi.
-    // Forced IPv4 dinonaktifkan default karena di banyak shared hosting justru
-    // menyebabkan koneksi gagal/timeout ke server tujuan.
+    // Urutan percobaan dibuat ramah shared hosting: verifikasi normal dulu,
+    // lalu fallback SSL dan IP resolve. Banyak hosting gagal karena CA bundle
+    // lama atau DNS mengarah ke IPv6 yang tidak bisa keluar.
     $attempts = [
         ['verify' => true,  'resolve' => 'default'],
         ['verify' => false, 'resolve' => 'default'],
     ];
+    if (defined('CURL_IPRESOLVE_V4')) {
+        $attempts[] = ['verify' => true,  'resolve' => 'ipv4'];
+        $attempts[] = ['verify' => false, 'resolve' => 'ipv4'];
+    }
 
     if (function_exists('curl_init')) {
         foreach ($attempts as $attempt) {
@@ -66,9 +70,12 @@ function http_get($url, array $opts = []) {
                 CURLOPT_SSL_VERIFYPEER => $attempt['verify'],
                 CURLOPT_SSL_VERIFYHOST => $attempt['verify'] ? 2 : 0,
                 CURLOPT_ENCODING => '',
+                CURLOPT_NOSIGNAL => true,
+                CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
             ];
-            // Forced IPv4 hanya jika diminta eksplisit (bukan default) untuk kompatibilitas hosting.
-            if (!empty($opts['force_ipv4']) && defined('CURL_IPRESOLVE_V4')) {
+            if ($attempt['resolve'] === 'ipv4' && defined('CURL_IPRESOLVE_V4')) {
+                $curlOpts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+            } elseif (!empty($opts['force_ipv4']) && defined('CURL_IPRESOLVE_V4')) {
                 $curlOpts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
             }
             curl_setopt_array($ch, $curlOpts);
@@ -82,13 +89,16 @@ function http_get($url, array $opts = []) {
                 'http_code' => $httpCode,
                 'effective_url' => $effectiveUrl !== '' ? $effectiveUrl : $url,
                 'ssl_verify' => $attempt['verify'] ? 1 : 0,
+                'ip_resolve' => $attempt['resolve'],
                 'engine' => 'curl',
             ];
 
             if ($html !== false && $html !== '' && $httpCode >= 200 && $httpCode < 400) {
                 return $html;
             }
-            $lastHttpError = $curlError !== '' ? $curlError : ('HTTP ' . $httpCode);
+            $lastHttpError = $curlError !== ''
+                ? $curlError
+                : ('HTTP ' . $httpCode . ' dari ' . ($effectiveUrl !== '' ? $effectiveUrl : $url));
         }
     }
 
@@ -112,6 +122,7 @@ function http_get($url, array $opts = []) {
                 'http_code' => 200,
                 'effective_url' => $url,
                 'ssl_verify' => $attempt['verify'] ? 1 : 0,
+                'ip_resolve' => $attempt['resolve'],
                 'engine' => 'file_get_contents',
             ];
             return $html;
@@ -392,7 +403,7 @@ function build_listing_page_url($listingUrl, $page): string {
 function fetch_listing_book_urls($listingUrl, $limit) {
     $urls = [];
     $page = 1;
-    $maxPages = 60;
+    $maxPages = max(1, min(20, (int)$limit));
 
     while (count($urls) < $limit && $page <= $maxPages) {
         $pageUrl = build_listing_page_url($listingUrl, $page);
@@ -438,7 +449,7 @@ function fetch_listing_book_urls($listingUrl, $limit) {
 function fetch_listing_books($listingUrl, $limit): array {
     $books = [];
     $page = 1;
-    $maxPages = 60;
+    $maxPages = max(1, min(20, (int)$limit));
 
     while (count($books) < $limit && $page <= $maxPages) {
         $pageUrl = build_listing_page_url($listingUrl, $page);
@@ -736,13 +747,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Tes dengan curl (beberapa strategi) dan file_get_contents.
         if (function_exists('curl_init')) {
             $strategies = [
-                ['label' => 'curl (verifikasi SSL)',   'verify' => true],
-                ['label' => 'curl (tanpa verifikasi)',  'verify' => false],
+                ['label' => 'curl (verifikasi SSL)',  'verify' => true,  'resolve' => 'default'],
+                ['label' => 'curl (tanpa verifikasi)', 'verify' => false, 'resolve' => 'default'],
             ];
+            if (defined('CURL_IPRESOLVE_V4')) {
+                $strategies[] = ['label' => 'curl IPv4 (verifikasi SSL)',  'verify' => true,  'resolve' => 'ipv4'];
+                $strategies[] = ['label' => 'curl IPv4 (tanpa verifikasi)', 'verify' => false, 'resolve' => 'ipv4'];
+            }
             foreach ($strategies as $s) {
                 $t0 = microtime(true);
                 $ch = curl_init($testUrl);
-                curl_setopt_array($ch, [
+                $curlOpts = [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_MAXREDIRS => 3,
@@ -752,15 +767,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     CURLOPT_SSL_VERIFYPEER => $s['verify'],
                     CURLOPT_SSL_VERIFYHOST => $s['verify'] ? 2 : 0,
                     CURLOPT_ENCODING => '',
-                ]);
+                    CURLOPT_NOSIGNAL => true,
+                    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+                ];
+                if (($s['resolve'] ?? 'default') === 'ipv4' && defined('CURL_IPRESOLVE_V4')) {
+                    $curlOpts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+                }
+                curl_setopt_array($ch, $curlOpts);
                 $body = curl_exec($ch);
                 $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $effectiveUrl = (string)curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
                 $err = curl_error($ch);
                 $errno = curl_errno($ch);
                 curl_close($ch);
                 $report['results'][] = [
                     'method' => $s['label'],
                     'http_code' => $code,
+                    'effective_url' => $effectiveUrl !== '' ? $effectiveUrl : $testUrl,
                     'bytes' => is_string($body) ? strlen($body) : 0,
                     'seconds' => round(microtime(true) - $t0, 2),
                     'errno' => $errno,
@@ -999,7 +1022,13 @@ include __DIR__ . '/template/sidebar.php';
                     <input type="number" name="limit" class="form-control" value="20" min="1" max="100">
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
+                <button type="button" class="btn btn-outline-secondary" id="btnDiagnoseImport"><i class="bi bi-wifi me-1"></i> Tes Koneksi Hosting</button>
+            </div>
+            <div class="alert alert-secondary mt-3 d-none" id="diagnoseResult">
+                <pre class="mb-0 small" style="white-space: pre-wrap;"></pre>
+            </div>
         </form>
 
         <?php if (!empty($results)): ?>
@@ -1089,6 +1118,34 @@ include __DIR__ . '/template/sidebar.php';
     function syncPayload() {
         $('#importPayload').value = JSON.stringify(ENRICH_DATA);
     }
+
+    $('#btnDiagnoseImport') && $('#btnDiagnoseImport').addEventListener('click', function () {
+        var btn = this;
+        var urlInput = document.querySelector('input[name="url"]');
+        var box = $('#diagnoseResult');
+        var pre = box ? box.querySelector('pre') : null;
+        var body = new URLSearchParams();
+        body.append('action', 'diagnose');
+        body.append('url', urlInput ? urlInput.value : '');
+
+        btn.disabled = true;
+        if (box && pre) {
+            box.classList.remove('d-none');
+            pre.textContent = 'Menguji koneksi...';
+        }
+
+        fetch(window.location.href, { method: 'POST', body: body })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (pre) pre.textContent = JSON.stringify(res, null, 2);
+            })
+            .catch(function (err) {
+                if (pre) pre.textContent = 'Tes koneksi gagal dijalankan: ' + (err && err.message ? err.message : err);
+            })
+            .finally(function () {
+                btn.disabled = false;
+            });
+    });
 
     function enrichOne(index) {
         if (stopRequested || index >= ENRICH_DATA.length) {

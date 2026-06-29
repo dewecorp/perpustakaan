@@ -426,11 +426,11 @@ function clean_old_activities() {
 }
 
 /**
- * Hapus data pengunjung lebih dari 1 tahun.
+ * Hapus data pengunjung lebih dari 30 hari.
  */
 function clean_old_visitors(): void {
     $pdo = db();
-    $pdo->query("DELETE FROM visitors WHERE visit_date < DATE_SUB(NOW(), INTERVAL 1 YEAR)");
+    $pdo->query("DELETE FROM visitors WHERE visit_date < DATE_SUB(NOW(), INTERVAL 30 DAY)");
 }
 
 /**

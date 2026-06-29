@@ -61,6 +61,28 @@ $visitors = $pdo->query("SELECT * FROM visitors ORDER BY visit_date DESC")->fetc
 $pageTitle = "Data Pengunjung";
 $pageSubtitle = "Pantau aktivitas kunjungan dan interaksi katalog digital";
 $activePage = 'visitors';
+$extra_css = "
+<style>
+    .visitors-summary-row {
+        margin-bottom: 1.5rem;
+    }
+    .visitors-timeline-card .card-body {
+        padding-bottom: 1.25rem !important;
+    }
+    .visitors-timeline-card .timeline {
+        margin-bottom: 0;
+    }
+    .visitors-detail-card {
+        margin-top: 0;
+    }
+    @media (max-width: 991.98px) {
+        .visitors-summary-row {
+            row-gap: 1rem;
+            margin-bottom: 1.25rem;
+        }
+    }
+</style>
+";
 
 include 'template/header.php';
 include 'template/sidebar.php';
@@ -104,9 +126,9 @@ include 'template/sidebar.php';
     </div>
 </div>
 
-<div class="row">
+<div class="row visitors-summary-row">
     <div class="col-lg-8">
-        <div class="card">
+        <div class="card visitors-timeline-card">
             <div class="card-header">
                 <h3 class="card-title"><i class="bi bi-clock-history me-1"></i> Riwayat Kunjungan Terbaru</h3>
                 <div class="card-tools">
@@ -223,7 +245,7 @@ include 'template/sidebar.php';
     </div>
 </div>
 
-<div class="card">
+<div class="card visitors-detail-card">
     <div class="card-header">
         <h3 class="card-title"><i class="bi bi-table me-1"></i> Data Lengkap Pengunjung</h3>
         <div class="card-tools">
