@@ -67,7 +67,7 @@ $activePage = 'dashboard';
 include 'template/header.php';
 include 'template/sidebar.php';
 ?>
-<div class="row">
+<div class="row g-3 mb-4">
     <div class="col-lg-3 col-6">
         <div class="small-box text-bg-primary">
             <div class="inner">
@@ -118,7 +118,7 @@ include 'template/sidebar.php';
     </div>
 </div>
 
-<div class="row">
+<div class="row g-3 mb-4">
     <div class="col-lg-8">
         <div class="card">
             <div class="card-header">
@@ -145,7 +145,7 @@ include 'template/sidebar.php';
     </div>
 </div>
 
-<div class="row">
+<div class="row g-3">
     <div class="col-12">
         <div class="card">
             <div class="card-header">

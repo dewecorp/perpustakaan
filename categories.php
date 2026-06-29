@@ -33,8 +33,10 @@ include 'template/sidebar.php';
                         <td><?php echo $index + 1; ?></td>
                         <td><?php echo htmlspecialchars($category['nama_kategori']); ?></td>
                         <td class="text-nowrap">
-                            <button class="btn btn-warning btn-sm" onclick="editKategori(<?php echo $category['id']; ?>, '<?php echo addslashes($category['nama_kategori']); ?>')"><i class="bi bi-pencil"></i> Edit</button>
-                            <button class="btn btn-danger btn-sm" onclick="confirmDelete(<?php echo $category['id']; ?>)"><i class="bi bi-trash"></i> Hapus</button>
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Aksi kategori">
+                                <button type="button" class="btn btn-warning" title="Edit" onclick="editKategori(<?php echo $category['id']; ?>, '<?php echo addslashes($category['nama_kategori']); ?>')"><i class="bi bi-pencil"></i></button>
+                                <button type="button" class="btn btn-danger" title="Hapus" onclick="confirmDelete(<?php echo $category['id']; ?>)"><i class="bi bi-trash"></i></button>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>

@@ -42,7 +42,7 @@ include 'template/sidebar.php';
                         <th>Kategori</th>
                         <th>Tahun</th>
                         <th>ISBN</th>
-                        <th style="width:160px">Aksi</th>
+                        <th class="text-nowrap">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -59,29 +59,31 @@ include 'template/sidebar.php';
                         <td><span class="badge text-bg-secondary"><?php echo htmlspecialchars($b['category']); ?></span></td>
                         <td><span class="badge text-bg-primary"><?php echo htmlspecialchars($b['year']); ?></span></td>
                         <td><?php echo htmlspecialchars($b['isbn'] ?? ''); ?></td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-primary me-1 btn-edit-book"
-                                data-bs-toggle="modal" data-bs-target="#bookModal"
-                                data-book="<?php echo htmlspecialchars(json_encode($b, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <form action="books_process.php" method="POST" style="display:inline" class="delete-book-form">
-                                <input type="hidden" name="action" value="delete">
-                                <input type="hidden" name="id" value="<?php echo (int)$b['id']; ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                            </form>
-                            <?php
-                                $hasLocalBook = !empty($b['book_path']);
-                                $hasRemoteBook = !empty($b['book_url']);
-                            ?>
-                            <?php if ($hasLocalBook || $hasRemoteBook): ?>
-                                <?php if ($hasLocalBook): ?>
-                                    <a href="track_book.php?id=<?php echo (int)$b['id']; ?>&action=download" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">Unduh</a>
-                                    <button type="button" class="btn btn-sm btn-outline-info btn-preview-book" data-id="<?php echo (int)$b['id']; ?>" data-path="<?php echo htmlspecialchars($b['book_path'], ENT_QUOTES, 'UTF-8'); ?>">Lihat</button>
-                                <?php else: ?>
-                                    <a href="track_book.php?id=<?php echo (int)$b['id']; ?>&action=view" class="btn btn-sm btn-outline-success" target="_blank" rel="noopener">Lihat</a>
+                        <td class="text-nowrap">
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Aksi buku">
+                                <button type="button" class="btn btn-warning btn-edit-book" title="Edit"
+                                    data-bs-toggle="modal" data-bs-target="#bookModal"
+                                    data-book="<?php echo htmlspecialchars(json_encode($b, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <form action="books_process.php" method="POST" class="delete-book-form" style="display: contents">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="id" value="<?php echo (int)$b['id']; ?>">
+                                    <button type="submit" class="btn btn-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                                </form>
+                                <?php
+                                    $hasLocalBook = !empty($b['book_path']);
+                                    $hasRemoteBook = !empty($b['book_url']);
+                                ?>
+                                <?php if ($hasLocalBook || $hasRemoteBook): ?>
+                                    <?php if ($hasLocalBook): ?>
+                                        <button type="button" class="btn btn-info btn-preview-book" title="Lihat" data-id="<?php echo (int)$b['id']; ?>" data-path="<?php echo htmlspecialchars($b['book_path'], ENT_QUOTES, 'UTF-8'); ?>"><i class="bi bi-eye"></i></button>
+                                        <a href="track_book.php?id=<?php echo (int)$b['id']; ?>&action=download" class="btn btn-success" title="Unduh" target="_blank" rel="noopener"><i class="bi bi-download"></i></a>
+                                    <?php else: ?>
+                                        <a href="track_book.php?id=<?php echo (int)$b['id']; ?>&action=view" class="btn btn-info" title="Lihat" target="_blank" rel="noopener"><i class="bi bi-eye"></i></a>
+                                    <?php endif; ?>
                                 <?php endif; ?>
-                            <?php endif; ?>
+                            </div>
                         </td>
                     </tr>
                     <?php endforeach; ?>

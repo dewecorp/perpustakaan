@@ -13,7 +13,7 @@ function render_book_card(array $book, array $opts = []): void
     $hasRemoteBook = !empty($book['book_url']);
     $desc = htmlspecialchars(substr($book['description'] ?? '', 0, 90)) . (strlen($book['description'] ?? '') > 90 ? '...' : '');
     ?>
-    <div class="col-md-6 col-lg-3 mb-4">
+    <div class="col-6 col-md-4 col-lg-3 mb-3 mb-md-4">
         <article class="book-card h-100">
             <div class="book-cover-wrap">
                 <img src="<?php echo htmlspecialchars($cover); ?>" class="book-cover<?php echo $isPlaceholder ? ' is-placeholder' : ''; ?>" alt="<?php echo htmlspecialchars($book['title']); ?>" loading="lazy" onerror="this.onerror=null;this.src='<?php echo book_cover_placeholder(); ?>';this.classList.add('is-placeholder');">
@@ -126,7 +126,9 @@ $categoryStats = $pdo->query("
     LIMIT 12
 ")->fetchAll();
 
-$schoolName = htmlspecialchars(get_setting('school_name', 'PUSDIGI'));
+$schoolNameRaw = get_setting('school_name', 'PUSDIGI');
+$schoolName = htmlspecialchars($schoolNameRaw);
+$schoolNameUpper = htmlspecialchars(mb_strtoupper($schoolNameRaw, 'UTF-8'));
 $hasActiveFilter = $cat || $year || $q;
 ?>
 <!DOCTYPE html>
@@ -456,10 +458,64 @@ $hasActiveFilter = $cat || $year || $q;
     .modal-backdrop.fade { opacity: 0; }
     .modal-backdrop.show { opacity: var(--bs-backdrop-opacity, 0.5) !important; }
 
+    .back-to-top {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      width: 48px;
+      height: 48px;
+      border: none;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0d47a1 0%, #1976d2 100%);
+      color: #fff;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(13, 71, 161, 0.35);
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition: opacity 0.3s, visibility 0.3s, transform 0.3s, box-shadow 0.2s;
+      z-index: 1050;
+    }
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .back-to-top:hover {
+      box-shadow: 0 6px 24px rgba(13, 71, 161, 0.45);
+      transform: translateY(-2px);
+    }
+    .back-to-top.visible:hover {
+      transform: translateY(-2px);
+    }
+
     @media (max-width: 991px) {
       .hero { min-height: 520px; padding: 2rem 0; }
       .stats-strip { margin-top: -32px; }
       .stat-card { margin-bottom: 0.75rem; }
+    }
+
+    @media (max-width: 767.98px) {
+      .book-cover-wrap { height: 140px; }
+      .book-cover.is-placeholder { padding: 0.75rem; }
+      .book-card-body { padding: 0.65rem 0.75rem 0.75rem; }
+      .book-category { font-size: 0.58rem; margin-bottom: 0.2rem; letter-spacing: 0.04em; }
+      .book-title { font-size: 0.78rem; line-height: 1.3; margin-bottom: 0.25rem; -webkit-line-clamp: 3; }
+      .book-author { font-size: 0.68rem; margin-bottom: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .book-author .bi { display: none; }
+      .book-desc { display: none; }
+      .book-meta { font-size: 0.65rem; gap: 0.5rem; margin-bottom: 0.4rem; }
+      .book-actions { flex-direction: column; gap: 0.3rem; padding-top: 0.5rem; }
+      .book-actions .btn { font-size: 0.7rem; padding: 0.3rem 0.4rem; width: 100%; }
+      .book-card:hover { transform: none; box-shadow: var(--card-shadow); }
+      .book-card:hover .book-cover { transform: none; }
+      .book-cover-overlay { display: none; }
+      .nav-pills .nav-link { font-size: 0.78rem; padding: 0.4rem 0.75rem; }
+      .back-to-top { width: 42px; height: 42px; bottom: 1rem; right: 1rem; font-size: 1.1rem; }
     }
   </style>
 </head>
@@ -468,7 +524,7 @@ $hasActiveFilter = $cat || $year || $q;
     <div class="container">
       <a class="navbar-brand d-flex align-items-center text-white" href="index.php">
         <img src="assets/images/logo.png?v=<?php echo file_exists('assets/images/logo.png') ? filemtime('assets/images/logo.png') : time(); ?>" alt="Logo" height="40" class="me-2 bg-white rounded p-1">
-        <span class="fw-bold ms-2 d-none d-md-block">PERPUSTAKAAN DIGITAL | <?php echo $schoolName; ?></span>
+        <span class="fw-bold ms-2 d-none d-md-block">PERPUSTAKAAN DIGITAL | <?php echo $schoolNameUpper; ?></span>
         <span class="fw-bold ms-2 d-block d-md-none" style="font-size: 1.2rem;">PUSDIGI</span>
       </a>
       <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navContent">
@@ -579,7 +635,7 @@ $hasActiveFilter = $cat || $year || $q;
       </div>
       <a href="index.php#katalog" class="btn btn-outline-primary btn-sm rounded-pill">Lihat Semua <i class="bi bi-arrow-right"></i></a>
     </div>
-    <div class="row">
+    <div class="row g-2 g-md-3">
       <?php foreach ($newBooks as $book): render_book_card($book); endforeach; ?>
     </div>
   </section>
@@ -602,12 +658,12 @@ $hasActiveFilter = $cat || $year || $q;
 
     <div class="tab-content">
       <div class="tab-pane fade show active" id="pills-view" role="tabpanel">
-        <div class="row">
+        <div class="row g-2 g-md-3">
           <?php foreach ($popViews as $book): render_book_card($book, ['show_views' => true]); endforeach; ?>
         </div>
       </div>
       <div class="tab-pane fade" id="pills-download" role="tabpanel">
-        <div class="row">
+        <div class="row g-2 g-md-3">
           <?php foreach ($popDownloads as $book): render_book_card($book, ['show_downloads' => true]); endforeach; ?>
         </div>
       </div>
@@ -665,7 +721,7 @@ $hasActiveFilter = $cat || $year || $q;
     </div>
     <?php endif; ?>
 
-    <div class="row">
+    <div class="row g-2 g-md-3">
       <?php if (empty($books)): ?>
       <div class="col-12 text-center py-5">
         <i class="bi bi-book text-muted" style="font-size: 4rem; opacity: 0.3;"></i>
@@ -712,7 +768,7 @@ $hasActiveFilter = $cat || $year || $q;
       <div class="row g-4">
         <div class="col-md-4">
           <h5 class="fw-bold mb-3"><i class="bi bi-book"></i> Perpustakaan Digital</h5>
-          <p class="small opacity-75"><?php echo $schoolName; ?> — Platform literasi digital untuk mengakses koleksi buku kapan saja, di mana saja.</p>
+          <p class="small opacity-75"><?php echo htmlspecialchars(get_setting('footer_description', 'Platform literasi digital untuk mengakses koleksi buku kapan saja, di mana saja.')); ?></p>
         </div>
         <div class="col-md-4">
           <h6 class="fw-bold mb-3">Navigasi Cepat</h6>
@@ -752,6 +808,10 @@ $hasActiveFilter = $cat || $year || $q;
     </div>
   </div>
 
+  <button type="button" class="back-to-top" id="backToTop" aria-label="Kembali ke atas" title="Kembali ke atas">
+    <i class="bi bi-arrow-up"></i>
+  </button>
+
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script>
@@ -778,6 +838,19 @@ $hasActiveFilter = $cat || $year || $q;
     document.getElementById('previewModal').addEventListener('hidden.bs.modal', function() {
       document.getElementById('previewFrame').src = '';
     });
+
+    (function() {
+      var btn = document.getElementById('backToTop');
+      if (!btn) return;
+
+      window.addEventListener('scroll', function() {
+        btn.classList.toggle('visible', window.scrollY > 400);
+      }, { passive: true });
+
+      btn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    })();
   </script>
 </body>
 </html>

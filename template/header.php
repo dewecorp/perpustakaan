@@ -123,9 +123,9 @@ $pageSubtitle = $pageSubtitle ?? '';
                     </a>
                 </li>
                 <li class="nav-item d-none d-md-block">
-                    <a href="<?php echo BASE_URL; ?>index.php" class="nav-link" target="_blank">
-                        <i class="bi bi-book me-1"></i> Katalog Publik
-                    </a>
+                    <span class="nav-link fw-semibold text-uppercase mb-0">
+                        <?php echo htmlspecialchars(mb_strtoupper(get_setting('school_name', 'Perpustakaan'), 'UTF-8')); ?>
+                    </span>
                 </li>
             </ul>
             <ul class="navbar-nav ms-auto">

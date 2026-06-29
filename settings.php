@@ -8,11 +8,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allowedTypes = ['jpg', 'jpeg', 'png', 'gif', 'ico'];
     $successMsg = '';
     $errorMsg = '';
+    $updatedItems = [];
 
     if (isset($_POST['school_name'])) {
         $schoolName = trim($_POST['school_name']);
         if (save_setting('school_name', $schoolName)) {
              $successMsg .= "Nama sekolah berhasil diperbarui. ";
+             $updatedItems[] = 'nama sekolah';
         } else {
              $errorMsg .= "Gagal menyimpan nama sekolah. ";
         }
@@ -25,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $targetFile = $targetDir . "logo.png";
             if (move_uploaded_file($_FILES["logo"]["tmp_name"], $targetFile)) {
                 $successMsg .= "Logo berhasil diperbarui. ";
+                $updatedItems[] = 'logo aplikasi';
             } else {
                 $errorMsg .= "Gagal mengupload logo. ";
             }
@@ -40,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              $targetFile = $targetDir . "book-hero.png";
              if (move_uploaded_file($_FILES["hero"]["tmp_name"], $targetFile)) {
                 $successMsg .= "Gambar Hero berhasil diperbarui. ";
+                $updatedItems[] = 'gambar hero';
              } else {
                 $errorMsg .= "Gagal mengupload gambar hero. ";
              }
@@ -55,8 +59,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $savedDesc = save_setting('hero_description', $heroDesc);
         if ($savedTitle && $savedDesc) {
              $successMsg .= "Teks Hero berhasil diperbarui. ";
+             $updatedItems[] = 'teks hero';
         } else {
              $errorMsg .= "Gagal menyimpan teks hero. ";
+        }
+    }
+
+    if (isset($_POST['footer_description'])) {
+        $footerDesc = trim($_POST['footer_description']);
+        if (save_setting('footer_description', $footerDesc)) {
+            $successMsg .= "Deskripsi footer berhasil diperbarui. ";
+            $updatedItems[] = 'deskripsi footer';
+        } else {
+            $errorMsg .= "Gagal menyimpan deskripsi footer. ";
         }
     }
 
@@ -67,12 +82,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              $targetFile = $targetDir . "login-bg.png";
              if (move_uploaded_file($_FILES["login_bg"]["tmp_name"], $targetFile)) {
                 $successMsg .= "Background Login berhasil diperbarui. ";
+                $updatedItems[] = 'background login';
              } else {
                 $errorMsg .= "Gagal mengupload background login. ";
              }
         } else {
             $errorMsg .= "Format file background tidak didukung. ";
         }
+    }
+
+    if (!empty($updatedItems)) {
+        $updatedItems = array_values(array_unique($updatedItems));
+        log_activity('update', activity_user_label() . ' memperbarui pengaturan: ' . implode(', ', $updatedItems));
     }
 
     if (!empty($successMsg)) $_SESSION['success'] = $successMsg;
@@ -130,6 +151,13 @@ include 'template/sidebar.php';
                 <label class="col-sm-3 col-form-label">Deskripsi Hero</label>
                 <div class="col-sm-9">
                     <textarea name="hero_description" id="hero_description" class="form-control"><?php echo htmlspecialchars((string)get_setting('hero_description', 'Akses ribuan koleksi buku digital dan fisik perpustakaan kami dengan mudah. Mulai petualangan literasimu hari ini.')); ?></textarea>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <label class="col-sm-3 col-form-label">Deskripsi Footer</label>
+                <div class="col-sm-9">
+                    <textarea name="footer_description" class="form-control" rows="3" placeholder="Deskripsi singkat di footer katalog publik"><?php echo htmlspecialchars((string)get_setting('footer_description', 'Platform literasi digital untuk mengakses koleksi buku kapan saja, di mana saja.')); ?></textarea>
+                    <small class="form-text text-muted">Ditampilkan di footer katalog publik (tanpa nama sekolah).</small>
                 </div>
             </div>
             <hr>
