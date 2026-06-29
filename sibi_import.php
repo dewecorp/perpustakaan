@@ -1165,6 +1165,7 @@ include __DIR__ . '/template/sidebar.php';
             <div class="d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
                 <button type="button" class="btn btn-outline-primary" id="btnBrowserFetch"><i class="bi bi-browser-chrome me-1"></i> Tarik via Browser</button>
+                <button type="button" class="btn btn-outline-success" id="btnPasteHtml"><i class="bi bi-code-square me-1"></i> Tempel HTML</button>
                 <button type="button" class="btn btn-outline-secondary" id="btnDiagnoseImport"><i class="bi bi-wifi me-1"></i> Tes Koneksi Hosting</button>
             </div>
             <div class="alert alert-secondary mt-3 d-none" id="diagnoseResult">
@@ -1178,6 +1179,27 @@ include __DIR__ . '/template/sidebar.php';
             <input type="hidden" name="limit" id="browserFetchLimit">
             <textarea name="fetched_html" id="browserFetchHtml"></textarea>
         </form>
+
+        <div class="card border-success d-none mb-4" id="pasteHtmlPanel">
+            <div class="card-header bg-success-subtle">
+                <h3 class="card-title mb-0">Import dari HTML Halaman</h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-2">
+                    Buka URL sumber di tab baru, tekan Ctrl+U, salin semua HTML, lalu tempel di sini.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="action" value="fetch_html">
+                    <input type="hidden" name="url" id="pasteHtmlUrl">
+                    <input type="hidden" name="limit" id="pasteHtmlLimit">
+                    <textarea name="fetched_html" class="form-control font-monospace" rows="8" placeholder="Tempel source HTML halaman sumber di sini"></textarea>
+                    <div class="mt-2 d-flex gap-2">
+                        <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Proses HTML</button>
+                        <button type="button" class="btn btn-outline-secondary" id="btnCancelPasteHtml">Batal</button>
+                    </div>
+                </form>
+            </div>
+        </div>
 
         <?php if (!empty($results)): ?>
             <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
@@ -1275,6 +1297,24 @@ include __DIR__ . '/template/sidebar.php';
         ];
     }
 
+    function fillPasteHtmlDefaults() {
+        var urlInput = document.querySelector('input[name="url"]');
+        var limitInput = document.querySelector('input[name="limit"]');
+        $('#pasteHtmlUrl').value = urlInput ? urlInput.value.trim() : '';
+        $('#pasteHtmlLimit').value = limitInput ? limitInput.value : '20';
+    }
+
+    $('#btnPasteHtml') && $('#btnPasteHtml').addEventListener('click', function () {
+        fillPasteHtmlDefaults();
+        $('#pasteHtmlPanel').classList.remove('d-none');
+        var textarea = $('#pasteHtmlPanel textarea[name="fetched_html"]');
+        if (textarea) textarea.focus();
+    });
+
+    $('#btnCancelPasteHtml') && $('#btnCancelPasteHtml').addEventListener('click', function () {
+        $('#pasteHtmlPanel').classList.add('d-none');
+    });
+
     $('#btnBrowserFetch') && $('#btnBrowserFetch').addEventListener('click', function () {
         var btn = this;
         var urlInput = document.querySelector('input[name="url"]');
@@ -1328,7 +1368,9 @@ include __DIR__ . '/template/sidebar.php';
                 $('#browserFetchForm').submit();
             })
             .catch(function (err) {
-                if (pre) pre.textContent = 'Tarik via Browser gagal: ' + (err && err.message ? err.message : err);
+                fillPasteHtmlDefaults();
+                $('#pasteHtmlPanel').classList.remove('d-none');
+                if (pre) pre.textContent = 'Tarik via Browser gagal: ' + (err && err.message ? err.message : err) + '\n\nFallback: buka URL sumber di tab baru, tekan Ctrl+U, salin semua HTML, lalu tempel di panel "Import dari HTML Halaman".';
                 btn.disabled = false;
             });
     });
