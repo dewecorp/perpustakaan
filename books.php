@@ -20,7 +20,8 @@ try {
 $pageTitle = "Kelola Buku";
 $pageSubtitle = "Tambah, ubah, dan hapus data buku";
 $activePage = 'books';
-$nextBookCode = generate_next_book_code($pdo);
+$nextBookCode = generate_next_book_code($pdo, (int)date('Y'), 'BK');
+$defaultBookYear = (int)date('Y');
 $pageActions = '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal" onclick="resetForm()"><i class="bi bi-plus-lg me-1"></i> Tambah Buku</button>';
 
 include 'template/header.php';
@@ -108,7 +109,7 @@ include 'template/sidebar.php';
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Kode Buku</label>
-                            <input name="code" id="code" class="form-control" required readonly placeholder="BK-MISF-0001">
+                            <input name="code" id="code" class="form-control" required readonly placeholder="BK-MISF2026-0001">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">ISBN</label>
@@ -133,7 +134,7 @@ include 'template/sidebar.php';
                         </div>
                         <div class="col-md-2 mb-3">
                             <label class="form-label">Tahun</label>
-                            <input name="year" id="year" type="number" class="form-control">
+                            <input name="year" id="year" type="number" class="form-control" min="1900" max="2100" value="<?php echo $defaultBookYear; ?>">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">URL Sampul (opsional)</label>
@@ -191,17 +192,38 @@ include 'template/sidebar.php';
 $extra_js = "
 <script>
 var nextBookCode = " . json_encode($nextBookCode) . ";
+var defaultBookYear = " . json_encode($defaultBookYear) . ";
+function refreshBookCode() {
+    var yearInput = document.getElementById('year');
+    var codeInput = document.getElementById('code');
+    if (!yearInput || !codeInput) return;
+    if (document.getElementById('formAction').value !== 'create') return;
+
+    var year = parseInt(yearInput.value, 10);
+    if (!year || year < 1900 || year > 2100) {
+        codeInput.value = '';
+        return;
+    }
+
+    fetch('" . BASE_URL . "api/next_book_code.php?year=' + encodeURIComponent(year) + '&type=BK')
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data && data.code) codeInput.value = data.code;
+        })
+        .catch(function() {});
+}
 function resetForm() {
     document.getElementById('bookForm').reset();
     document.getElementById('formAction').value = 'create';
     document.getElementById('bookId').value = '';
-    document.getElementById('code').value = nextBookCode;
+    document.getElementById('year').value = defaultBookYear;
     document.getElementById('code').readOnly = true;
     document.getElementById('modalTitle').textContent = 'Tambah Buku';
     var useUrlOnly = document.getElementById('use_book_url_only');
     if (useUrlOnly) useUrlOnly.checked = false;
     var hint = document.getElementById('bookSourceHint');
     if (hint) hint.textContent = '';
+    refreshBookCode();
 }
 function editBook(data) {
     if (!data) return;
@@ -247,6 +269,10 @@ $(document).ready(function() {
     });
     $(document).on('click', '.btn-preview-book', function() {
         previewBook(this.getAttribute('data-id'), this.getAttribute('data-path'));
+    });
+
+    $(document).on('input change', '#year', function() {
+        refreshBookCode();
     });
 
     var table = $('#booksTable').DataTable({

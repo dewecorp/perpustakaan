@@ -189,21 +189,34 @@ function book_cover_placeholder(): string {
 }
 
 /**
- * Kode buku berikutnya: BK-MISF-0001, BK-MISF-0002, ...
+ * Kode buku berikutnya: BK-MISF2026-0001, BI-MISF2026-0001, ...
+ *
+ * @param string $type BK = input manual, BI = hasil impor
  */
-function generate_next_book_code(PDO $pdo): string {
-    $prefix = 'BK-MISF-';
+function generate_next_book_code(PDO $pdo, int $year = 0, string $type = 'BK'): string {
+    $type = strtoupper($type);
+    if (!in_array($type, ['BK', 'BI'], true)) {
+        $type = 'BK';
+    }
+    if ($year < 1900 || $year > 2100) {
+        $year = (int)date('Y');
+    }
+
+    $prefix = $type . '-MISF' . $year . '-';
+    $pattern = '/^' . preg_quote($type, '/') . '-MISF' . $year . '-(\d+)$/';
     $max = 0;
-    $stmt = $pdo->query("SELECT code FROM books WHERE code LIKE 'BK-MISF-%'");
+    $stmt = $pdo->prepare('SELECT code FROM books WHERE code LIKE ?');
+    $stmt->execute([$prefix . '%']);
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
         $code = (string)($row['code'] ?? '');
-        if (preg_match('/^BK-MISF-(\d+)$/', $code, $m)) {
+        if (preg_match($pattern, $code, $m)) {
             $num = (int)$m[1];
             if ($num > $max) {
                 $max = $num;
             }
         }
     }
+
     return $prefix . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
 }
 
