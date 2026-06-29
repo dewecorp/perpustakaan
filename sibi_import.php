@@ -694,6 +694,7 @@ function parse_detail($url, $fallback = []) {
 
 $results = [];
 $message = '';
+$debugInfo = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -702,6 +703,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $listingUrl = trim($_POST['listing_url'] ?? '');
         $detailUrls = trim($_POST['detail_urls'] ?? '');
         $limit = max(1, min(100, intval($_POST['limit'] ?? 20)));
+        $debug = isset($_GET['debug']) && $_GET['debug'] === '1';
 
         $previewBooks = [];
         if ($listingUrl) {
@@ -747,6 +749,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (count($results) >= $limit) {
                 break;
             }
+        }
+
+        if ($debug) {
+            $detailListCount = 0;
+            if ($detailUrls) {
+                $detailListCount = count(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $detailUrls))));
+            }
+            $debugInfo = '<details class="mt-2"><summary><strong>Debug</strong></summary><pre style="white-space:pre-wrap;margin:0;">'
+                . htmlspecialchars(json_encode([
+                    'listing_url' => $listingUrl,
+                    'detail_urls_count' => $detailListCount,
+                    'preview_books_count' => count($previewBooks),
+                    'unique_urls_count' => count($seen),
+                    'results_count' => count($results),
+                    'last_http_error' => http_get_last_error(),
+                    'last_http_info' => http_get_last_info(),
+                    'sample_preview' => array_slice($previewBooks, 0, 3),
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), ENT_QUOTES, 'UTF-8')
+                . '</pre></details>';
         }
         if (!$results) {
             $httpError = http_get_last_error();
@@ -831,6 +852,9 @@ include __DIR__ . '/template/sidebar.php';
     <div class="card-body">
                             <?php if ($message): ?>
                                 <div class="alert alert-warning"><?php echo htmlspecialchars($message); ?></div>
+                            <?php endif; ?>
+                            <?php if (!empty($debugInfo)): ?>
+                                <div class="alert alert-secondary"><?php echo $debugInfo; ?></div>
                             <?php endif; ?>
                             <form method="POST" class="mb-4">
                                 <input type="hidden" name="action" value="fetch">
