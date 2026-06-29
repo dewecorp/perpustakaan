@@ -5,6 +5,15 @@ require_admin();
 
 header('Content-Type: application/json; charset=utf-8');
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dismiss'])) {
+    $sha = trim((string)($_POST['sha'] ?? ''));
+    if ($sha !== '') {
+        github_dismiss_update_popup($sha);
+    }
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 $force = isset($_GET['force']) && $_GET['force'] === '1';
 $result = check_github_update($force);
 

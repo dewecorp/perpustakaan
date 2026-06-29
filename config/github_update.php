@@ -5,7 +5,7 @@
 
 const GITHUB_REPO = 'dewecorp/perpustakaan';
 const GITHUB_BRANCH = 'main';
-const GITHUB_CHECK_CACHE_SECONDS = 3600;
+const GITHUB_CHECK_CACHE_SECONDS = 180;
 
 function github_token(): string
 {
@@ -190,6 +190,11 @@ function github_save_bundled_commit(string $sha, string $date): void
 
 function github_installed_commit(): array
 {
+    $bundled = github_bundled_commit();
+    if ($bundled['sha_full'] !== '') {
+        return $bundled;
+    }
+
     $installedFull = get_setting('installed_commit_sha', '');
     $installedDate = get_setting('installed_commit_date', '');
 
@@ -200,7 +205,7 @@ function github_installed_commit(): array
         ];
     }
 
-    return github_bundled_commit();
+    return ['sha_full' => '', 'date' => ''];
 }
 
 function github_build_latest_from_cache(string $shaFull): array
@@ -237,6 +242,21 @@ function github_update_result(array $installed, ?array $latest, ?int $checkedAt,
     ];
 }
 
+function github_should_show_update_popup(array $githubUpdate): bool
+{
+    if (empty($githubUpdate['has_update']) || empty($githubUpdate['latest']['sha_full'])) {
+        return false;
+    }
+
+    $dismissedSha = (string)($_SESSION['github_update_dismissed_sha'] ?? '');
+    return $dismissedSha !== $githubUpdate['latest']['sha_full'];
+}
+
+function github_dismiss_update_popup(string $latestSha): void
+{
+    $_SESSION['github_update_dismissed_sha'] = $latestSha;
+}
+
 function mark_github_update_installed(): void
 {
     $latestSha = get_setting('github_latest_commit_sha', '');
@@ -258,6 +278,7 @@ function mark_github_update_installed(): void
     save_setting('installed_commit_date', $latestDate ?: date('c'));
     save_setting('github_update_has_update', '0');
     github_save_bundled_commit($latestSha, $latestDate ?: date('c'));
+    unset($_SESSION['github_update_dismissed_sha']);
 }
 
 /**

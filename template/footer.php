@@ -162,13 +162,12 @@ Swal.fire({ icon: 'error', title: 'Gagal!', text: <?php echo json_encode($_SESSI
 <?php if (
     !empty($githubUpdate['has_update'])
     && current_user_role() === 'admin'
-    && ($activePage ?? '') === 'dashboard'
-    && empty($_SESSION['github_update_notif_shown'])
+    && github_should_show_update_popup($githubUpdate ?? [])
 ): ?>
-<?php $_SESSION['github_update_notif_shown'] = true; ?>
+<?php $latestUpdateSha = (string)($githubUpdate['latest']['sha_full'] ?? ''); ?>
 Swal.fire({
     title: 'Pembaruan Sistem Tersedia!',
-    text: 'Versi terbaru tersedia di GitHub. Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.',
+    html: 'Versi terbaru <strong><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? ''); ?></strong> tersedia di GitHub.<br>Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.',
     icon: 'info',
     showCancelButton: true,
     confirmButtonText: 'Update Sekarang',
@@ -178,8 +177,34 @@ Swal.fire({
     if (result.isConfirmed) {
         var btn = document.getElementById('btnUpdateSystem');
         if (btn) btn.click();
+    } else if (result.dismiss === Swal.DismissReason.cancel) {
+        fetch('<?php echo BASE_URL; ?>check_github_update.php', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+            body: 'dismiss=1&sha=' + encodeURIComponent(<?php echo json_encode($latestUpdateSha); ?>)
+        });
     }
 });
+<?php endif; ?>
+<?php if (current_user_role() === 'admin'): ?>
+(function pollGithubUpdate() {
+    var hasUpdateBadge = <?php echo !empty($githubUpdate['has_update']) ? 'true' : 'false'; ?>;
+    var pollMs = <?php echo GITHUB_CHECK_CACHE_SECONDS * 1000; ?>;
+    setInterval(function() {
+        fetch('<?php echo BASE_URL; ?>check_github_update.php?force=1', {
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.has_update && !hasUpdateBadge) {
+                window.location.reload();
+            }
+        })
+        .catch(function() {});
+    }, pollMs);
+})();
 <?php endif; ?>
 <?php include __DIR__ . '/idle_lock_script.php'; ?>
 function updateClock() {

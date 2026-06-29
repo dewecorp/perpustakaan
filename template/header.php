@@ -3,7 +3,7 @@ $lteBase = BASE_URL . 'assets/vendor/admin-lte/';
 $pageSubtitle = $pageSubtitle ?? '';
 $githubUpdate = null;
 if (isset($_SESSION['user']) && current_user_role() === 'admin') {
-    $githubUpdate = check_github_update();
+    $githubUpdate = check_github_update(true);
 }
 ?>
 <!DOCTYPE html>
@@ -181,6 +181,12 @@ if (isset($_SESSION['user']) && current_user_role() === 'admin') {
                             <i class="bi bi-cloud-download me-1"></i> Pembaruan Tersedia
                         </div>
                         <div class="p-3">
+                            <p class="small text-muted mb-2">
+                                Commit <strong><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? ''); ?></strong>
+                                <?php if (!empty($githubUpdate['latest']['message'])): ?>
+                                — <?php echo htmlspecialchars($githubUpdate['latest']['message']); ?>
+                                <?php endif; ?>
+                            </p>
                             <button type="button" class="btn btn-primary btn-sm w-100" id="btnUpdateFromNotif">
                                 <i class="bi bi-cloud-download me-1"></i> Update Sekarang
                             </button>
