@@ -51,9 +51,16 @@ function http_get($url, array $opts = []) {
         ['verify' => true,  'resolve' => 'default'],
         ['verify' => false, 'resolve' => 'default'],
     ];
-    if (defined('CURL_IPRESOLVE_V4')) {
+    if (empty($opts['skip_proxy']) && defined('CURL_IPRESOLVE_V4')) {
         $attempts[] = ['verify' => true,  'resolve' => 'ipv4'];
         $attempts[] = ['verify' => false, 'resolve' => 'ipv4'];
+    }
+
+    if (empty($opts['skip_proxy']) && import_should_prefer_proxy($url)) {
+        $proxyHtml = http_get_via_import_proxy($url, 'Direct request dilewati untuk host yang sering timeout di shared hosting', []);
+        if ($proxyHtml !== '') {
+            return $proxyHtml;
+        }
     }
 
     if (function_exists('curl_init')) {
@@ -154,8 +161,8 @@ function http_get_via_import_proxy(string $url, string $directError, array $dire
     foreach (import_proxy_urls($url) as $proxyUrl) {
         $proxyHtml = http_get($proxyUrl, [
             'skip_proxy' => true,
-            'connect_timeout' => 10,
-            'timeout' => 35,
+            'connect_timeout' => 4,
+            'timeout' => 12,
         ]);
         if ($proxyHtml !== '') {
             $lastHttpInfo = array_merge(http_get_last_info(), [
@@ -181,6 +188,13 @@ function import_proxy_urls(string $url): array {
     return [
         'https://api.allorigins.win/raw?url=' . rawurlencode($url),
     ];
+}
+
+function import_should_prefer_proxy(string $url): bool {
+    $host = strtolower((string)(parse_url($url, PHP_URL_HOST) ?? ''));
+    return in_array($host, [
+        'cendikia.kemenag.go.id',
+    ], true);
 }
 
 function url_host($url): string {
@@ -779,7 +793,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'diagnose') {
         // Tes koneksi keluar untuk membantu mendiagnosis kegagalan di hosting.
         // Mengembalikan JSON rinci: ketersediaan curl, DNS, SSL, HTTP code, waktu, error.
-        @set_time_limit(60);
+        @set_time_limit(25);
         $testUrl = trim($_POST['url'] ?? 'https://cendikia.kemenag.go.id/publik/kategori/1');
         if (!preg_match('#^https?://#i', $testUrl)) {
             $testUrl = 'https://cendikia.kemenag.go.id/publik/kategori/1';
@@ -803,11 +817,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Tes dengan curl (beberapa strategi) dan file_get_contents.
         if (function_exists('curl_init')) {
-            $strategies = [
-                ['label' => 'curl (verifikasi SSL)',  'verify' => true,  'resolve' => 'default'],
-                ['label' => 'curl (tanpa verifikasi)', 'verify' => false, 'resolve' => 'default'],
-            ];
-            if (defined('CURL_IPRESOLVE_V4')) {
+            $strategies = import_should_prefer_proxy($testUrl)
+                ? [['label' => 'curl direct singkat', 'verify' => false, 'resolve' => 'default']]
+                : [
+                    ['label' => 'curl (verifikasi SSL)',  'verify' => true,  'resolve' => 'default'],
+                    ['label' => 'curl (tanpa verifikasi)', 'verify' => false, 'resolve' => 'default'],
+                ];
+            if (!import_should_prefer_proxy($testUrl) && defined('CURL_IPRESOLVE_V4')) {
                 $strategies[] = ['label' => 'curl IPv4 (verifikasi SSL)',  'verify' => true,  'resolve' => 'ipv4'];
                 $strategies[] = ['label' => 'curl IPv4 (tanpa verifikasi)', 'verify' => false, 'resolve' => 'ipv4'];
             }
@@ -818,8 +834,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_MAXREDIRS => 3,
-                    CURLOPT_CONNECTTIMEOUT => 8,
-                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_CONNECTTIMEOUT => import_should_prefer_proxy($testUrl) ? 2 : 5,
+                    CURLOPT_TIMEOUT => import_should_prefer_proxy($testUrl) ? 3 : 8,
                     CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36',
                     CURLOPT_SSL_VERIFYPEER => $s['verify'],
                     CURLOPT_SSL_VERIFYHOST => $s['verify'] ? 2 : 0,
@@ -850,10 +866,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if ((bool)ini_get('allow_url_fopen')) {
+        if ((bool)ini_get('allow_url_fopen') && !import_should_prefer_proxy($testUrl)) {
             $t0 = microtime(true);
             $ctx = stream_context_create([
-                'http' => ['method' => 'GET', 'timeout' => 12, 'ignore_errors' => true,
+                'http' => ['method' => 'GET', 'timeout' => import_should_prefer_proxy($testUrl) ? 3 : 8, 'ignore_errors' => true,
                     'header' => "User-Agent: Mozilla/5.0 Chrome/120\r\n"],
                 'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
             ]);
@@ -869,7 +885,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         foreach (import_proxy_urls($testUrl) as $proxyUrl) {
             $t0 = microtime(true);
-            $proxyBody = http_get($proxyUrl, ['skip_proxy' => true, 'connect_timeout' => 10, 'timeout' => 35]);
+            $proxyBody = http_get($proxyUrl, ['skip_proxy' => true, 'connect_timeout' => 3, 'timeout' => 8]);
             $proxyInfo = http_get_last_info();
             $report['results'][] = [
                 'method' => 'proxy fallback',
