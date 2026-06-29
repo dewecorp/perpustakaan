@@ -906,6 +906,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $report['can_reach_target'] = $anyOk;
 
         import_json_response($report);
+    } elseif ($action === 'fetch_html') {
+        @set_time_limit(30);
+        $sourceUrl = trim($_POST['url'] ?? '');
+        $html = (string)($_POST['fetched_html'] ?? '');
+        $limit = max(1, min(100, intval($_POST['limit'] ?? 20)));
+
+        if (!preg_match('#^https?://#i', $sourceUrl) || trim($html) === '') {
+            $message = 'HTML dari browser kosong. Coba ulangi Tarik via Browser.';
+        } else {
+            if (is_book_detail_url($sourceUrl)) {
+                $book = empty_book_data($sourceUrl, ['read_url' => $sourceUrl]);
+                $title = extract_title_from_html($html);
+                if ($title !== '') {
+                    $book['title'] = $title;
+                }
+                $cover = extract_cover_from_html($html, $sourceUrl);
+                if ($cover !== '') {
+                    $book['cover_url'] = $cover;
+                }
+                extract_file_links_from_html($html, $sourceUrl, $book);
+                enrich_book_metadata($book, $html);
+                if ($book['title'] !== '' && !is_generic_page_title($book['title'])) {
+                    $results[] = $book;
+                }
+            } else {
+                $pageBooks = parse_listing_previews($sourceUrl, $html);
+                if (empty($pageBooks)) {
+                    foreach (parse_listing_links($sourceUrl, $html) as $detailUrl) {
+                        $pageBooks[] = empty_book_data($detailUrl, ['read_url' => $detailUrl]);
+                    }
+                }
+                $seen = [];
+                foreach ($pageBooks as $book) {
+                    $detailUrl = trim((string)($book['detail_url'] ?? ''));
+                    if ($detailUrl === '' || isset($seen[$detailUrl])) {
+                        continue;
+                    }
+                    $seen[$detailUrl] = true;
+                    if (empty($book['read_url'])) {
+                        $book['read_url'] = $detailUrl;
+                    }
+                    $results[] = $book;
+                    if (count($results) >= $limit) {
+                        break;
+                    }
+                }
+            }
+
+            if (!$results) {
+                $message = 'HTML berhasil diterima, tetapi tidak ada buku yang bisa diparse dari halaman tersebut.';
+            }
+        }
     } elseif ($action === 'fetch') {
         // Hanya ambil daftar buku dari halaman listing. TIDAK memanggil parse_detail
         // per-buku di sini (penyebab utama freeze/loading tanpa akhir). Pengayaan
@@ -1112,11 +1164,19 @@ include __DIR__ . '/template/sidebar.php';
             </div>
             <div class="d-flex flex-wrap gap-2">
                 <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
+                <button type="button" class="btn btn-outline-primary" id="btnBrowserFetch"><i class="bi bi-browser-chrome me-1"></i> Tarik via Browser</button>
                 <button type="button" class="btn btn-outline-secondary" id="btnDiagnoseImport"><i class="bi bi-wifi me-1"></i> Tes Koneksi Hosting</button>
             </div>
             <div class="alert alert-secondary mt-3 d-none" id="diagnoseResult">
                 <pre class="mb-0 small" style="white-space: pre-wrap;"></pre>
             </div>
+        </form>
+
+        <form method="POST" class="d-none" id="browserFetchForm">
+            <input type="hidden" name="action" value="fetch_html">
+            <input type="hidden" name="url" id="browserFetchUrl">
+            <input type="hidden" name="limit" id="browserFetchLimit">
+            <textarea name="fetched_html" id="browserFetchHtml"></textarea>
         </form>
 
         <?php if (!empty($results)): ?>
@@ -1206,6 +1266,72 @@ include __DIR__ . '/template/sidebar.php';
     function syncPayload() {
         $('#importPayload').value = JSON.stringify(ENRICH_DATA);
     }
+
+    function browserProxyUrls(url) {
+        return [
+            'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+            'https://corsproxy.io/?' + encodeURIComponent(url),
+            'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(url)
+        ];
+    }
+
+    $('#btnBrowserFetch') && $('#btnBrowserFetch').addEventListener('click', function () {
+        var btn = this;
+        var urlInput = document.querySelector('input[name="url"]');
+        var limitInput = document.querySelector('input[name="limit"]');
+        var url = urlInput ? urlInput.value.trim() : '';
+        var box = $('#diagnoseResult');
+        var pre = box ? box.querySelector('pre') : null;
+
+        if (!/^https?:\/\//i.test(url)) {
+            if (box && pre) {
+                box.classList.remove('d-none');
+                pre.textContent = 'Masukkan URL sumber buku yang valid terlebih dahulu.';
+            }
+            return;
+        }
+
+        btn.disabled = true;
+        if (box && pre) {
+            box.classList.remove('d-none');
+            pre.textContent = 'Browser sedang mengambil HTML sumber...';
+        }
+
+        var proxies = browserProxyUrls(url);
+        var lastError = '';
+
+        function tryProxy(i) {
+            if (i >= proxies.length) {
+                throw new Error(lastError || 'Semua proxy browser gagal.');
+            }
+            return fetch(proxies[i], { method: 'GET' })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status + ' dari proxy browser');
+                    return r.text();
+                })
+                .then(function (html) {
+                    if (!html || html.length < 200) throw new Error('HTML terlalu pendek dari proxy browser');
+                    return html;
+                })
+                .catch(function (err) {
+                    lastError = err && err.message ? err.message : String(err);
+                    return tryProxy(i + 1);
+                });
+        }
+
+        tryProxy(0)
+            .then(function (html) {
+                $('#browserFetchUrl').value = url;
+                $('#browserFetchLimit').value = limitInput ? limitInput.value : '20';
+                $('#browserFetchHtml').value = html;
+                if (pre) pre.textContent = 'HTML berhasil diambil oleh browser. Memproses daftar buku...';
+                $('#browserFetchForm').submit();
+            })
+            .catch(function (err) {
+                if (pre) pre.textContent = 'Tarik via Browser gagal: ' + (err && err.message ? err.message : err);
+                btn.disabled = false;
+            });
+    });
 
     $('#btnDiagnoseImport') && $('#btnDiagnoseImport').addEventListener('click', function () {
         var btn = this;
