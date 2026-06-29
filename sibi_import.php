@@ -707,7 +707,95 @@ $debugInfo = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-    if ($action === 'fetch') {
+    if ($action === 'diagnose') {
+        // Tes koneksi keluar untuk membantu mendiagnosis kegagalan di hosting.
+        // Mengembalikan JSON rinci: ketersediaan curl, DNS, SSL, HTTP code, waktu, error.
+        @set_time_limit(60);
+        header('Content-Type: application/json; charset=utf-8');
+        $testUrl = trim($_POST['url'] ?? 'https://cendikia.kemenag.go.id/publik/kategori/1');
+        if (!preg_match('#^https?://#i', $testUrl)) {
+            $testUrl = 'https://cendikia.kemenag.go.id/publik/kategori/1';
+        }
+        $host = (string)(parse_url($testUrl, PHP_URL_HOST) ?? '');
+
+        $report = [
+            'curl_enabled' => function_exists('curl_init'),
+            'curl_version' => function_exists('curl_version') ? (curl_version()['version'] ?? '') : '',
+            'openssl_loaded' => extension_loaded('openssl'),
+            'allow_url_fopen' => (bool)ini_get('allow_url_fopen'),
+            'max_execution_time' => ini_get('max_execution_time'),
+            'target_host' => $host,
+            'dns_resolves' => null,
+            'results' => [],
+        ];
+
+        // Tes DNS (gethostbyname mengembalikan IP string, atau host asli jika gagal).
+        $ip = @gethostbyname($host);
+        $report['dns_resolves'] = ($ip && $ip !== $host) ? $ip : false;
+
+        // Tes dengan curl (beberapa strategi) dan file_get_contents.
+        if (function_exists('curl_init')) {
+            $strategies = [
+                ['label' => 'curl (verifikasi SSL)',   'verify' => true],
+                ['label' => 'curl (tanpa verifikasi)',  'verify' => false],
+            ];
+            foreach ($strategies as $s) {
+                $t0 = microtime(true);
+                $ch = curl_init($testUrl);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 3,
+                    CURLOPT_CONNECTTIMEOUT => 8,
+                    CURLOPT_TIMEOUT => 15,
+                    CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36',
+                    CURLOPT_SSL_VERIFYPEER => $s['verify'],
+                    CURLOPT_SSL_VERIFYHOST => $s['verify'] ? 2 : 0,
+                    CURLOPT_ENCODING => '',
+                ]);
+                $body = curl_exec($ch);
+                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $err = curl_error($ch);
+                $errno = curl_errno($ch);
+                curl_close($ch);
+                $report['results'][] = [
+                    'method' => $s['label'],
+                    'http_code' => $code,
+                    'bytes' => is_string($body) ? strlen($body) : 0,
+                    'seconds' => round(microtime(true) - $t0, 2),
+                    'errno' => $errno,
+                    'error' => $err,
+                    'ok' => ($code >= 200 && $code < 400 && is_string($body) && $body !== ''),
+                ];
+            }
+        }
+
+        if ((bool)ini_get('allow_url_fopen')) {
+            $t0 = microtime(true);
+            $ctx = stream_context_create([
+                'http' => ['method' => 'GET', 'timeout' => 12, 'ignore_errors' => true,
+                    'header' => "User-Agent: Mozilla/5.0 Chrome/120\r\n"],
+                'ssl' => ['verify_peer' => false, 'verify_peer_name' => false],
+            ]);
+            $body = @file_get_contents($testUrl, false, $ctx);
+            $report['results'][] = [
+                'method' => 'file_get_contents',
+                'bytes' => is_string($body) ? strlen($body) : 0,
+                'seconds' => round(microtime(true) - $t0, 2),
+                'error' => (is_string($body) && $body !== '') ? '' : 'Gagal membaca stream',
+                'ok' => is_string($body) && $body !== '',
+            ];
+        }
+
+        $anyOk = false;
+        foreach ($report['results'] as $r) {
+            if (!empty($r['ok'])) { $anyOk = true; break; }
+        }
+        $report['can_reach_target'] = $anyOk;
+
+        echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        exit;
+    } elseif ($action === 'fetch') {
         // Hanya ambil daftar buku dari halaman listing. TIDAK memanggil parse_detail
         // per-buku di sini (penyebab utama freeze/loading tanpa akhir). Pengayaan
         // metadata per-buku dilakukan terpisah lewat action=enrich (AJAX bertahap).
