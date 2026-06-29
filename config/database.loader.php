@@ -65,5 +65,7 @@ function load_database_config(string $configDir): void
         exit;
     }
 
+    // require di dalam fungsi: tanpa global, kredensial hanya ada di scope lokal
+    global $DB_HOST, $DB_NAME, $DB_USER, $DB_PASS, $DB_CHARSET;
     require $databaseFile;
 }

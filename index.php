@@ -536,7 +536,7 @@ $hasActiveFilter = $cat || $year || $q;
           <li class="nav-item"><a class="nav-link text-white fw-bold" href="#katalog"><i class="bi bi-grid"></i> Katalog</a></li>
           <li class="nav-item"><a class="nav-link text-white" href="#populer"><i class="bi bi-fire"></i> Populer</a></li>
           <li class="nav-item">
-            <a class="nav-link text-white" href="<?php echo isset($_SESSION['user']) ? 'dashboard.php' : 'auth/login.php'; ?>" title="<?php echo isset($_SESSION['user']) ? 'Dashboard Admin' : 'Login Admin'; ?>">
+            <a class="nav-link text-white" href="<?php echo BASE_URL . (isset($_SESSION['user']) ? 'dashboard.php' : 'auth/login.php'); ?>" target="_blank" rel="noopener noreferrer" title="<?php echo isset($_SESSION['user']) ? 'Dashboard Admin' : 'Login Admin'; ?>">
               <i class="bi bi-gear" style="font-size: 1.2rem;"></i>
             </a>
           </li>
