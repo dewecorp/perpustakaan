@@ -3,7 +3,7 @@ require_once 'config/config.php';
 require_login();
 
 $pdo = db();
-$books = $pdo->query("SELECT * FROM books ORDER BY created_at DESC")->fetchAll();
+$books = $pdo->query("SELECT * FROM books ORDER BY created_at DESC, id DESC")->fetchAll();
 $categoriesList = [];
 try {
     $stmtCats = $pdo->query("SELECT id, nama_kategori FROM categories ORDER BY nama_kategori ASC");
@@ -255,7 +255,7 @@ $(document).ready(function() {
             { targets: 0, orderable: false, searchable: false, className: 'text-center' },
             { targets: -1, orderable: false, searchable: false }
         ],
-        order: [[1, 'asc']],
+        order: [],
         drawCallback: function() {
             var api = this.api();
             var start = api.page.info().start;
