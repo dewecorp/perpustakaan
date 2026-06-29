@@ -764,13 +764,22 @@ $results = [];
 $message = '';
 $debugInfo = '';
 
+function import_json_response(array $payload, int $status = 200): void {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    http_response_code($status);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'diagnose') {
         // Tes koneksi keluar untuk membantu mendiagnosis kegagalan di hosting.
         // Mengembalikan JSON rinci: ketersediaan curl, DNS, SSL, HTTP code, waktu, error.
         @set_time_limit(60);
-        header('Content-Type: application/json; charset=utf-8');
         $testUrl = trim($_POST['url'] ?? 'https://cendikia.kemenag.go.id/publik/kategori/1');
         if (!preg_match('#^https?://#i', $testUrl)) {
             $testUrl = 'https://cendikia.kemenag.go.id/publik/kategori/1';
@@ -880,8 +889,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $report['can_reach_target'] = $anyOk;
 
-        echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+        import_json_response($report);
     } elseif ($action === 'fetch') {
         // Hanya ambil daftar buku dari halaman listing. TIDAK memanggil parse_detail
         // per-buku di sini (penyebab utama freeze/loading tanpa akhir). Pengayaan
@@ -1198,8 +1206,21 @@ include __DIR__ . '/template/sidebar.php';
             pre.textContent = 'Menguji koneksi...';
         }
 
-        fetch(window.location.href, { method: 'POST', body: body })
-            .then(function (r) { return r.json(); })
+        fetch(window.location.href, {
+            method: 'POST',
+            body: body,
+            credentials: 'same-origin',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) {
+                return r.text().then(function (text) {
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        throw new Error('Server membalas HTML/teks, bukan JSON:\n' + text.slice(0, 1200));
+                    }
+                });
+            })
             .then(function (res) {
                 if (pre) pre.textContent = JSON.stringify(res, null, 2);
             })
