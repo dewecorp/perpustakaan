@@ -39,10 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+        $code = generate_next_book_code($pdo);
+
         $stmt = $pdo->prepare("INSERT INTO books (code, isbn, title, author, category, year, cover_url, cover_path, book_path, book_url, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         try {
             $stmt->execute([
-                $_POST['code'],
+                $code,
                 $_POST['isbn'] ?? '',
                 $_POST['title'],
                 $_POST['author'],

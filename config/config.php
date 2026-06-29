@@ -189,6 +189,25 @@ function book_cover_placeholder(): string {
 }
 
 /**
+ * Kode buku berikutnya: BK-MISF-0001, BK-MISF-0002, ...
+ */
+function generate_next_book_code(PDO $pdo): string {
+    $prefix = 'BK-MISF-';
+    $max = 0;
+    $stmt = $pdo->query("SELECT code FROM books WHERE code LIKE 'BK-MISF-%'");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $code = (string)($row['code'] ?? '');
+        if (preg_match('/^BK-MISF-(\d+)$/', $code, $m)) {
+            $num = (int)$m[1];
+            if ($num > $max) {
+                $max = $num;
+            }
+        }
+    }
+    return $prefix . str_pad((string)($max + 1), 4, '0', STR_PAD_LEFT);
+}
+
+/**
  * Nama pengunjung untuk log kunjungan buku.
  */
 function visitor_display_name(): string {

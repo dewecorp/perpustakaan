@@ -20,6 +20,7 @@ try {
 $pageTitle = "Kelola Buku";
 $pageSubtitle = "Tambah, ubah, dan hapus data buku";
 $activePage = 'books';
+$nextBookCode = generate_next_book_code($pdo);
 $pageActions = '<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookModal" onclick="resetForm()"><i class="bi bi-plus-lg me-1"></i> Tambah Buku</button>';
 
 include 'template/header.php';
@@ -107,7 +108,7 @@ include 'template/sidebar.php';
                     <div class="row">
                         <div class="col-md-3 mb-3">
                             <label class="form-label">Kode Buku</label>
-                            <input name="code" id="code" class="form-control" required placeholder="ex: BK-001">
+                            <input name="code" id="code" class="form-control" required readonly placeholder="BK-MISF-0001">
                         </div>
                         <div class="col-md-3 mb-3">
                             <label class="form-label">ISBN</label>
@@ -189,10 +190,13 @@ include 'template/sidebar.php';
 <?php
 $extra_js = "
 <script>
+var nextBookCode = " . json_encode($nextBookCode) . ";
 function resetForm() {
     document.getElementById('bookForm').reset();
     document.getElementById('formAction').value = 'create';
     document.getElementById('bookId').value = '';
+    document.getElementById('code').value = nextBookCode;
+    document.getElementById('code').readOnly = true;
     document.getElementById('modalTitle').textContent = 'Tambah Buku';
     var useUrlOnly = document.getElementById('use_book_url_only');
     if (useUrlOnly) useUrlOnly.checked = false;
@@ -204,6 +208,7 @@ function editBook(data) {
     document.getElementById('formAction').value = 'update';
     document.getElementById('bookId').value = data.id;
     document.getElementById('code').value = data.code || '';
+    document.getElementById('code').readOnly = true;
     document.getElementById('isbn').value = data.isbn || '';
     document.getElementById('title').value = data.title || '';
     document.getElementById('author').value = data.author || '';
