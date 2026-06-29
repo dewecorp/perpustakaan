@@ -241,6 +241,7 @@ $hasActiveFilter = $cat || $year || $q;
 
     /* Section headers */
     .section-header { margin-bottom: 2rem; }
+    #katalog { scroll-margin-top: 5.5rem; }
     .section-header h2 {
       font-weight: 800;
       color: var(--primary);
@@ -678,10 +679,10 @@ $hasActiveFilter = $cat || $year || $q;
 
     <div class="card filter-card">
       <div class="card-body">
-        <form method="GET" class="row g-3 align-items-end">
+        <form method="GET" action="index.php#katalog" id="catalogFilterForm" class="row g-3 align-items-end">
           <div class="col-md-3">
             <label class="form-label">KATEGORI</label>
-            <select name="cat" class="form-select" onchange="this.form.submit()">
+            <select name="cat" class="form-select" onchange="submitCatalogFilter(this.form)">
               <option value="">Semua Kategori</option>
               <?php foreach ($cats as $c): ?>
               <option value="<?php echo htmlspecialchars($c); ?>" <?php echo $cat === $c ? 'selected' : ''; ?>><?php echo htmlspecialchars($c); ?></option>
@@ -690,7 +691,7 @@ $hasActiveFilter = $cat || $year || $q;
           </div>
           <div class="col-md-2">
             <label class="form-label">TAHUN</label>
-            <select name="year" class="form-select" onchange="this.form.submit()">
+            <select name="year" class="form-select" onchange="submitCatalogFilter(this.form)">
               <option value="">Semua Tahun</option>
               <?php foreach ($years as $y): ?>
               <option value="<?php echo htmlspecialchars($y); ?>" <?php echo $year == $y ? 'selected' : ''; ?>><?php echo htmlspecialchars($y); ?></option>
@@ -815,6 +816,41 @@ $hasActiveFilter = $cat || $year || $q;
   <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
   <script>
+    function submitCatalogFilter(form) {
+      var params = new URLSearchParams(new FormData(form));
+      ['cat', 'year', 'q'].forEach(function(key) {
+        if (!params.get(key)) params.delete(key);
+      });
+      params.delete('page');
+      var qs = params.toString();
+      window.location.assign('index.php' + (qs ? '?' + qs : '') + '#katalog');
+    }
+
+    function scrollToCatalogSection() {
+      var el = document.getElementById('katalog');
+      if (el) el.scrollIntoView();
+    }
+
+    (function() {
+      var form = document.getElementById('catalogFilterForm');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          submitCatalogFilter(form);
+        });
+      }
+
+      var params = new URLSearchParams(window.location.search);
+      var hasCatalogContext = window.location.hash === '#katalog'
+        || params.has('cat') || params.has('year') || params.has('q') || params.has('page');
+      if (hasCatalogContext) {
+        if (window.location.hash !== '#katalog') {
+          history.replaceState(null, '', window.location.pathname + window.location.search + '#katalog');
+        }
+        scrollToCatalogSection();
+      }
+    })();
+
     function updateClock() {
       var el = document.getElementById('live-clock');
       if (el) {
