@@ -102,6 +102,13 @@ function http_get($url, array $opts = []) {
         }
     }
 
+    if (function_exists('curl_init') && empty($opts['skip_proxy'])) {
+        $proxyHtml = http_get_via_import_proxy($url, $lastHttpError, $lastHttpInfo);
+        if ($proxyHtml !== '') {
+            return $proxyHtml;
+        }
+    }
+
     $headerLines = "User-Agent: {$userAgent}\r\n" . implode("\r\n", $headers);
     foreach ($attempts as $attempt) {
         $context = stream_context_create([
@@ -132,7 +139,48 @@ function http_get($url, array $opts = []) {
     if ($lastHttpError === '') {
         $lastHttpError = 'Gagal mengambil halaman (curl/file_get_contents tidak tersedia atau diblokir hosting)';
     }
+
+    if (empty($opts['skip_proxy'])) {
+        $proxyHtml = http_get_via_import_proxy($url, $lastHttpError, $lastHttpInfo);
+        if ($proxyHtml !== '') {
+            return $proxyHtml;
+        }
+    }
     return '';
+}
+
+function http_get_via_import_proxy(string $url, string $directError, array $directInfo): string {
+    global $lastHttpError, $lastHttpInfo;
+    foreach (import_proxy_urls($url) as $proxyUrl) {
+        $proxyHtml = http_get($proxyUrl, [
+            'skip_proxy' => true,
+            'connect_timeout' => 10,
+            'timeout' => 35,
+        ]);
+        if ($proxyHtml !== '') {
+            $lastHttpInfo = array_merge(http_get_last_info(), [
+                'proxied' => true,
+                'source_url' => $url,
+                'proxy_url' => $proxyUrl,
+                'direct_error' => $directError,
+                'direct_info' => $directInfo,
+            ]);
+            $lastHttpError = '';
+            return $proxyHtml;
+        }
+    }
+    $lastHttpError = $directError . ' | Proxy fallback juga gagal: ' . http_get_last_error();
+    $lastHttpInfo = $directInfo;
+    return '';
+}
+
+function import_proxy_urls(string $url): array {
+    if (!preg_match('#^https?://#i', $url)) {
+        return [];
+    }
+    return [
+        'https://api.allorigins.win/raw?url=' . rawurlencode($url),
+    ];
 }
 
 function url_host($url): string {
@@ -807,6 +855,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'seconds' => round(microtime(true) - $t0, 2),
                 'error' => (is_string($body) && $body !== '') ? '' : 'Gagal membaca stream',
                 'ok' => is_string($body) && $body !== '',
+            ];
+        }
+
+        foreach (import_proxy_urls($testUrl) as $proxyUrl) {
+            $t0 = microtime(true);
+            $proxyBody = http_get($proxyUrl, ['skip_proxy' => true, 'connect_timeout' => 10, 'timeout' => 35]);
+            $proxyInfo = http_get_last_info();
+            $report['results'][] = [
+                'method' => 'proxy fallback',
+                'proxy_url' => $proxyUrl,
+                'http_code' => $proxyInfo['http_code'] ?? null,
+                'effective_url' => $proxyInfo['effective_url'] ?? $proxyUrl,
+                'bytes' => is_string($proxyBody) ? strlen($proxyBody) : 0,
+                'seconds' => round(microtime(true) - $t0, 2),
+                'error' => $proxyBody !== '' ? '' : http_get_last_error(),
+                'ok' => $proxyBody !== '',
             ];
         }
 
