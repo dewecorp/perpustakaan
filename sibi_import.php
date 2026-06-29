@@ -773,9 +773,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($preview['read_url'])) {
                 $preview['read_url'] = $detailUrl;
             }
-            $book = parse_detail($detailUrl, $preview) ?: $preview;
-            if (!empty($book['title']) && !is_generic_page_title($book['title'])) {
-                $results[] = $book;
+           
+            if (!empty($preview['title']) && !is_generic_page_title($preview['title'])) {
+                $results[] = $preview;
+
             }
             if (count($results) >= $limit) {
                 break;
