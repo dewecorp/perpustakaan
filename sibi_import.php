@@ -20,7 +20,7 @@ function http_get_last_info(): array {
     return is_array($lastHttpInfo) ? $lastHttpInfo : [];
 }
 
-function http_get($url) {
+function http_get($url, array $opts = []) {
     global $lastHttpError, $lastHttpInfo;
     $lastHttpError = '';
     $lastHttpInfo = [];
@@ -29,6 +29,11 @@ function http_get($url) {
         $lastHttpError = 'URL kosong';
         return '';
     }
+
+    // Default lebih agresif: koneksi cepat gagal (10s) & total 25s supaya request
+    // tidak menggantung menahan seluruh halaman (penyebab "freeze" / loading tanpa akhir).
+    $connectTimeout = (int)($opts['connect_timeout'] ?? 10);
+    $totalTimeout = (int)($opts['timeout'] ?? 25);
 
     $userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
     $headers = [
@@ -39,30 +44,34 @@ function http_get($url) {
         'Referer: ' . preg_replace('#\?.*$#', '', $url),
     ];
 
+    // Urutan percobaan: native (verify on) -> lewat proxy tanpa verifikasi.
+    // Forced IPv4 dinonaktifkan default karena di banyak shared hosting justru
+    // menyebabkan koneksi gagal/timeout ke server tujuan.
     $attempts = [
-        ['verify' => true],
-        ['verify' => false],
+        ['verify' => true,  'resolve' => 'default'],
+        ['verify' => false, 'resolve' => 'default'],
     ];
 
     if (function_exists('curl_init')) {
         foreach ($attempts as $attempt) {
             $ch = curl_init($url);
-            $opts = [
+            $curlOpts = [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 8,
-                CURLOPT_CONNECTTIMEOUT => 20,
-                CURLOPT_TIMEOUT => 60,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_CONNECTTIMEOUT => $connectTimeout,
+                CURLOPT_TIMEOUT => $totalTimeout,
                 CURLOPT_USERAGENT => $userAgent,
                 CURLOPT_HTTPHEADER => $headers,
                 CURLOPT_SSL_VERIFYPEER => $attempt['verify'],
                 CURLOPT_SSL_VERIFYHOST => $attempt['verify'] ? 2 : 0,
                 CURLOPT_ENCODING => '',
             ];
-            if (defined('CURL_IPRESOLVE_V4')) {
-                $opts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+            // Forced IPv4 hanya jika diminta eksplisit (bukan default) untuk kompatibilitas hosting.
+            if (!empty($opts['force_ipv4']) && defined('CURL_IPRESOLVE_V4')) {
+                $curlOpts[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
             }
-            curl_setopt_array($ch, $opts);
+            curl_setopt_array($ch, $curlOpts);
             $html = curl_exec($ch);
             $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $effectiveUrl = (string)curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
@@ -89,7 +98,7 @@ function http_get($url) {
             'http' => [
                 'method' => 'GET',
                 'header' => $headerLines . "\r\n",
-                'timeout' => 60,
+                'timeout' => $totalTimeout,
                 'ignore_errors' => true,
             ],
             'ssl' => [
@@ -699,41 +708,51 @@ $debugInfo = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'fetch') {
-        @set_time_limit(300);
-        $listingUrl = trim($_POST['listing_url'] ?? '');
-        $detailUrls = trim($_POST['detail_urls'] ?? '');
-        $limit = max(1, min(100, intval($_POST['limit'] ?? 20)));
+        // Hanya ambil daftar buku dari halaman listing. TIDAK memanggil parse_detail
+        // per-buku di sini (penyebab utama freeze/loading tanpa akhir). Pengayaan
+        // metadata per-buku dilakukan terpisah lewat action=enrich (AJAX bertahap).
+        @set_time_limit(120);
+        $rawInput = trim($_POST['url'] ?? '');
+        $limit = max(1, min(500, intval($_POST['limit'] ?? 50)));
         $debug = isset($_GET['debug']) && $_GET['debug'] === '1';
 
-        $previewBooks = [];
-        if ($listingUrl) {
-            if (is_book_detail_url($listingUrl)) {
-                $previewBooks[] = ['detail_url' => $listingUrl, 'title' => '', 'author' => '', 'isbn' => '', 'year' => '', 'jenjang' => '', 'kurikulum' => '', 'cover_url' => '', 'read_url' => $listingUrl, 'download_url' => ''];
-            } else {
-                $previewBooks = fetch_listing_books($listingUrl, $limit);
+        // Satu input untuk semua jenis URL:
+        //  - URL halaman daftar/kategori -> ambil seluruh buku di dalamnya (otomatis multi-halaman)
+        //  - URL detail satu buku        -> ambil buku tersebut saja
+        //  - Banyak URL (satu per baris) -> setiap baris dievaluasi sendiri-sendiri
+        $inputUrls = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r|[\s,]+/", $rawInput))));
+        $listingUrls = [];
+        $detailOnly = [];
+
+        foreach ($inputUrls as $u) {
+            if ($u === '' || !preg_match('#^https?://#i', $u)) {
+                continue;
             }
-        }
-        if ($detailUrls) {
-            foreach (preg_split("/\r\n|\n|\r/", $detailUrls) as $u) {
-                $u = trim($u);
-                if ($u === '') {
-                    continue;
-                }
-                $previewBooks[] = [
-                    'detail_url' => $u,
-                    'title' => '',
-                    'author' => '',
-                    'isbn' => '',
-                    'year' => '',
-                    'jenjang' => '',
-                    'kurikulum' => '',
-                    'cover_url' => '',
-                    'read_url' => $u,
-                    'download_url' => '',
-                ];
+            if (is_book_detail_url($u)) {
+                $detailOnly[$u] = empty_book_data($u, ['read_url' => $u]);
+            } else {
+                $listingUrls[$u] = true;
             }
         }
 
+        $previewBooks = [];
+
+        // Proses URL kategori/daftar terlebih dahulu.
+        foreach (array_keys($listingUrls) as $listingUrl) {
+            $fetched = fetch_listing_books($listingUrl, $limit);
+            foreach ($fetched as $b) {
+                $previewBooks[] = $b;
+            }
+            if (count($previewBooks) >= $limit) {
+                break;
+            }
+        }
+        // Tambahkan URL detail tunggal.
+        foreach ($detailOnly as $b) {
+            $previewBooks[] = $b;
+        }
+
+        // Dedup & limit — tanpa fetch detail.
         $seen = [];
         foreach ($previewBooks as $preview) {
             $detailUrl = trim((string)($preview['detail_url'] ?? ''));
@@ -741,25 +760,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 continue;
             }
             $seen[$detailUrl] = true;
-            $d = parse_detail($detailUrl, $preview);
-            if (!$d) {
-                continue;
+            $preview['detail_url'] = $detailUrl;
+            // Pastikan read_url terisi agar tombol "Lihat" selalu berfungsi.
+            if (empty($preview['read_url'])) {
+                $preview['read_url'] = $detailUrl;
             }
-            $results[] = $d;
+            $results[] = $preview;
             if (count($results) >= $limit) {
                 break;
             }
         }
 
         if ($debug) {
-            $detailListCount = 0;
-            if ($detailUrls) {
-                $detailListCount = count(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $detailUrls))));
-            }
             $debugInfo = '<details class="mt-2"><summary><strong>Debug</strong></summary><pre style="white-space:pre-wrap;margin:0;">'
                 . htmlspecialchars(json_encode([
-                    'listing_url' => $listingUrl,
-                    'detail_urls_count' => $detailListCount,
+                    'input' => $rawInput,
+                    'listing_urls' => array_keys($listingUrls),
+                    'detail_only_urls' => array_keys($detailOnly),
                     'preview_books_count' => count($previewBooks),
                     'unique_urls_count' => count($seen),
                     'results_count' => count($results),
@@ -771,18 +788,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!$results) {
             $httpError = http_get_last_error();
-            if ($listingUrl && !$detailUrls) {
-                if ($httpError !== '') {
-                    $message = 'Gagal mengambil data dari URL katalog: ' . $httpError . '. Pastikan hosting mengizinkan koneksi HTTPS keluar (curl aktif).';
-                } else {
-                    $message = 'Tidak ada buku yang berhasil diambil dari URL katalog. Pastikan URL adalah halaman daftar/kategori buku. Jika situs memuat data lewat JavaScript saja, gunakan kolom "Daftar URL Detail Buku".';
-                }
+            if ($httpError !== '') {
+                $message = 'Gagal mengambil data dari URL: ' . $httpError . '. Pastikan hosting mengizinkan koneksi HTTPS keluar (curl aktif).';
+            } elseif (!empty($inputUrls)) {
+                $message = 'Tidak ada buku yang berhasil diambil dari URL. Pastikan URL adalah halaman daftar/kategori buku atau halaman detail buku.';
             } else {
-                $message = $httpError !== ''
-                    ? 'Tidak ada buku yang berhasil diambil. Error: ' . $httpError
-                    : 'Tidak ada buku yang berhasil diambil dari URL yang diberikan.';
+                $message = 'Masukkan URL terlebih dahulu.';
             }
         }
+    } elseif ($action === 'enrich') {
+        // Pengayaan metadata SATU buku lewat AJAX. Dijalankan satu-per-satu dari
+        // browser sehingga UI tetap responsif & bisa dihentikan (tidak freeze).
+        @set_time_limit(60);
+        header('Content-Type: application/json; charset=utf-8');
+        $raw = $_POST['payload'] ?? '';
+        $b = json_decode($raw, true);
+        if (!is_array($b) || empty($b['detail_url'])) {
+            echo json_encode(['ok' => false, 'error' => 'Payload tidak valid']);
+            exit;
+        }
+        $detailUrl = trim((string)$b['detail_url']);
+        $fallback = empty_book_data($detailUrl, $b);
+        $d = parse_detail($detailUrl, $fallback);
+        if (!$d) {
+            // Gagal ambil detail: kembalikan data listing apa adanya agar tetap bisa diimpor.
+            $fallback['detail_url'] = $detailUrl;
+            if (!empty($b['title'])) {
+                $fallback['title'] = trim((string)$b['title']);
+            }
+            echo json_encode(['ok' => false, 'data' => $fallback, 'error' => http_get_last_error()]);
+            exit;
+        }
+        echo json_encode(['ok' => true, 'data' => $d]);
+        exit;
     } elseif ($action === 'import') {
         $payload = json_decode($_POST['payload'] ?? '[]', true);
         if (is_array($payload)) {
@@ -847,73 +885,185 @@ include __DIR__ . '/template/sidebar.php';
 ?>
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">Ambil Data</h3>
+        <h3 class="card-title">Impor Buku dari Web</h3>
     </div>
     <div class="card-body">
-                            <?php if ($message): ?>
-                                <div class="alert alert-warning"><?php echo htmlspecialchars($message); ?></div>
-                            <?php endif; ?>
-                            <?php if (!empty($debugInfo)): ?>
-                                <div class="alert alert-secondary"><?php echo $debugInfo; ?></div>
-                            <?php endif; ?>
-                            <form method="POST" class="mb-4">
-                                <input type="hidden" name="action" value="fetch">
-                                <div class="mb-3">
-                                    <label class="form-label">URL Daftar Buku (opsional)</label>
-                                    <input type="url" name="listing_url" class="form-control" placeholder="https://contoh-perpustakaan.go.id/kategori/...">
-                                    <small class="text-muted">URL halaman daftar/kategori buku dari situs perpustakaan digital mana pun. Sistem mendeteksi link detail buku secara otomatis (termasuk halaman berikutnya).</small>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Daftar URL Detail Buku (opsional) - satu per baris</label>
-                                    <textarea name="detail_urls" class="form-control" rows="4" placeholder="https://contoh-perpustakaan.go.id/buku/...&#10;https://contoh-perpustakaan.go.id/buku_detail/123"></textarea>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-3 mb-3">
-                                        <label class="form-label">Batas Maksimal</label>
-                                        <input type="number" name="limit" class="form-control" value="20" min="1" max="100">
-                                    </div>
-                                </div>
-                                <button type="submit" class="btn btn-primary">Tarik Data</button>
-                            </form>
+        <?php if ($message): ?>
+            <div class="alert alert-warning"><?php echo htmlspecialchars($message); ?></div>
+        <?php endif; ?>
+        <?php if (!empty($debugInfo)): ?>
+            <div class="alert alert-secondary"><?php echo $debugInfo; ?></div>
+        <?php endif; ?>
 
-                            <?php if (!empty($results)): ?>
-                                <h5 class="mt-4">Pratinjau Hasil (<?php echo count($results); ?>)</h5>
-                                <div class="table-responsive">
-                                    <table class="table table-striped">
-                                        <thead>
-                                            <tr>
-                                                <th>Judul</th>
-                                                <th>Penulis</th>
-                                                <th>ISBN</th>
-                                                <th>Jenjang</th>
-                                                <th>Tahun</th>
-                                                <th>Sampul</th>
-                                                <th>Lihat</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <?php foreach ($results as $r): ?>
-                                                <tr>
-                                                    <td><?php echo htmlspecialchars($r['title']); ?></td>
-                                                    <td><?php echo htmlspecialchars($r['author'] ?: '—'); ?></td>
-                                                    <td><?php echo htmlspecialchars($r['isbn'] ?: '—'); ?></td>
-                                                    <td><?php echo htmlspecialchars($r['jenjang'] ?: '—'); ?></td>
-                                                    <td><?php echo htmlspecialchars($r['year'] ?: '—'); ?></td>
-                                                    <td><?php if($r['cover_url']): ?><img src="<?php echo htmlspecialchars($r['cover_url']); ?>" style="height:48px"><?php endif; ?></td>
-                                                    <td><a href="<?php echo htmlspecialchars($r['read_url'] ?: $r['detail_url']); ?>" target="_blank" class="btn btn-sm btn-outline-info">Lihat</a></td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <form method="POST" class="mt-3">
-                                    <input type="hidden" name="action" value="import">
-                                    <input type="hidden" name="payload" value="<?php echo htmlspecialchars(json_encode($results, JSON_UNESCAPED_SLASHES)); ?>">
-                                    <button type="submit" class="btn btn-success">Import Semua</button>
-                                </form>
-                            <?php endif; ?>
+        <form method="POST" class="mb-4">
+            <input type="hidden" name="action" value="fetch">
+            <div class="mb-3">
+                <label class="form-label">URL Sumber Buku</label>
+                <input type="text" name="url" class="form-control" placeholder="Contoh: https://cendikia.kemenag.go.id/publik/kategori/1" value="<?php echo htmlspecialchars($_POST['url'] ?? ''); ?>">
+                <small class="text-muted">
+                    Bisa: <b>URL kategori/daftar buku</b> (mis. <code>/kategori/1</code>), <b>URL detail satu buku</b>, atau <b>beberapa URL sekaligus</b> (dipisah baris/spasi).
+                    Sistem mendeteksi jenisnya otomatis. Untuk URL kategori, buku di halaman berikutnya ikut diambil.
+                </small>
+            </div>
+            <div class="row">
+                <div class="col-6 col-md-3 mb-3">
+                    <label class="form-label">Batas Maksimal</label>
+                    <input type="number" name="limit" class="form-control" value="20" min="1" max="100">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-cloud-download me-1"></i> Tarik Data</button>
+        </form>
+
+        <?php if (!empty($results)): ?>
+            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                <h5 class="mb-0">Pratinjau Hasil (<span id="bookCount"><?php echo count($results); ?></span>)</h5>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-info" id="btnEnrich"><i class="bi bi-magic me-1"></i> Lengkapi Detail</button>
+                    <button type="button" class="btn btn-warning d-none" id="btnStopEnrich"><i class="bi bi-stop-circle me-1"></i> Stop</button>
+                </div>
+            </div>
+
+            <div class="progress mb-3 d-none" id="enrichProgressWrap" style="height: 22px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" id="enrichProgressBar" role="progressbar" style="width:0%;">0%</div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-striped" id="previewTable">
+                    <thead>
+                        <tr>
+                            <th style="width:1%">#</th>
+                            <th>Judul</th>
+                            <th>Penulis</th>
+                            <th>ISBN</th>
+                            <th>Jenjang</th>
+                            <th>Tahun</th>
+                            <th>Sampul</th>
+                            <th>Status</th>
+                            <th>Lihat</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewBody">
+                        <?php foreach ($results as $i => $r): ?>
+                            <tr data-index="<?php echo (int)$i; ?>">
+                                <td><?php echo (int)$i + 1; ?></td>
+                                <td class="cell-title"><?php echo htmlspecialchars($r['title']); ?></td>
+                                <td class="cell-author"><?php echo htmlspecialchars($r['author'] ?: '—'); ?></td>
+                                <td class="cell-isbn"><?php echo htmlspecialchars($r['isbn'] ?: '—'); ?></td>
+                                <td class="cell-jenjang"><?php echo htmlspecialchars($r['jenjang'] ?: '—'); ?></td>
+                                <td class="cell-year"><?php echo htmlspecialchars($r['year'] ?: '—'); ?></td>
+                                <td class="cell-cover"><?php if (!empty($r['cover_url'])): ?><img src="<?php echo htmlspecialchars($r['cover_url']); ?>" style="height:48px"><?php endif; ?></td>
+                                <td class="cell-status"><span class="badge text-bg-secondary">menunggu</span></td>
+                                <td><a href="<?php echo htmlspecialchars($r['read_url'] ?: $r['detail_url']); ?>" target="_blank" class="btn btn-sm btn-outline-info">Lihat</a></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <form method="POST" class="mt-3" id="importForm">
+                <input type="hidden" name="action" value="import">
+                <input type="hidden" name="payload" id="importPayload" value="<?php echo htmlspecialchars(json_encode($results, JSON_UNESCAPED_SLASHES)); ?>">
+                <button type="submit" class="btn btn-success"><i class="bi bi-check2-circle me-1"></i> Import Semua</button>
+            </form>
+        <?php endif; ?>
     </div>
 </div>
+
+<script>
+(function () {
+    var ENRICH_DATA = <?php echo json_encode($results, JSON_UNESCAPED_SLASHES); ?>;
+    var enriching = false;
+    var stopRequested = false;
+
+    function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+    function setRowStatus(row, text, cls) {
+        var cell = row.querySelector('.cell-status');
+        if (!cell) return;
+        cell.innerHTML = '<span class="badge ' + (cls || 'text-bg-secondary') + '">' + text + '</span>';
+    }
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function updateRow(index, d) {
+        var row = $('#previewBody tr[data-index="' + index + '"]');
+        if (!row) return;
+        if (d.title)   row.querySelector('.cell-title').textContent   = d.title;
+        if (d.author)  row.querySelector('.cell-author').textContent  = d.author;
+        if (d.isbn)    row.querySelector('.cell-isbn').textContent    = d.isbn;
+        if (d.jenjang) row.querySelector('.cell-jenjang').textContent = d.jenjang;
+        if (d.year)    row.querySelector('.cell-year').textContent    = d.year;
+        if (d.cover_url) row.querySelector('.cell-cover').innerHTML = '<img src="' + esc(d.cover_url) + '" style="height:48px">';
+        // Simpan data terbaru ke ENRICH_DATA supaya ikut ter-impor.
+        ENRICH_DATA[index] = Object.assign({}, ENRICH_DATA[index] || {}, d);
+    }
+    function syncPayload() {
+        $('#importPayload').value = JSON.stringify(ENRICH_DATA);
+    }
+
+    function enrichOne(index) {
+        if (stopRequested || index >= ENRICH_DATA.length) {
+            finishEnrich();
+            return;
+        }
+        var row = $('#previewBody tr[data-index="' + index + '"]');
+        if (row) setRowStatus(row, 'memproses', 'text-bg-info');
+        updateProgress(index);
+
+        var body = new URLSearchParams();
+        body.append('action', 'enrich');
+        body.append('payload', JSON.stringify(ENRICH_DATA[index]));
+
+        fetch(window.location.href, { method: 'POST', body: body })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res && res.data) updateRow(index, res.data);
+                if (row) setRowStatus(row, (res && res.ok) ? 'lengkap' : 'minimum', (res && res.ok) ? 'text-bg-success' : 'text-bg-warning');
+                syncPayload();
+                enrichOne(index + 1);
+            })
+            .catch(function () {
+                if (row) setRowStatus(row, 'gagal', 'text-bg-danger');
+                enrichOne(index + 1);
+            });
+    }
+
+    function updateProgress(index) {
+        var total = ENRICH_DATA.length;
+        var done = index;
+        var pct = Math.round((done / total) * 100);
+        $('#enrichProgressBar').style.width = pct + '%';
+        $('#enrichProgressBar').textContent = pct + '%';
+    }
+
+    function finishEnrich() {
+        enriching = false;
+        $('#btnEnrich').disabled = false;
+        $('#btnStopEnrich').classList.add('d-none');
+        $('#enrichProgressBar').classList.remove('progress-bar-animated');
+        $('#enrichProgressBar').style.width = '100%';
+        $('#enrichProgressBar').textContent = '100%';
+        syncPayload();
+    }
+
+    $('#btnEnrich') && $('#btnEnrich').addEventListener('click', function () {
+        if (enriching || ENRICH_DATA.length === 0) return;
+        enriching = true;
+        stopRequested = false;
+        this.disabled = true;
+        $('#btnStopEnrich').classList.remove('d-none');
+        $('#enrichProgressWrap').classList.remove('d-none');
+        $('#enrichProgressBar').classList.add('progress-bar-animated');
+        enrichOne(0);
+    });
+
+    $('#btnStopEnrich') && $('#btnStopEnrich').addEventListener('click', function () {
+        stopRequested = true;
+        this.disabled = true;
+    });
+})();
+</script>
 <?php
 include __DIR__ . '/template/footer.php';
 ?>
