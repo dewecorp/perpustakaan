@@ -2,7 +2,8 @@
 require_once '../config/config.php';
 
 if (isset($_SESSION['user'])) {
-    log_activity('logout', 'User logged out');
+    $uid = (int)$_SESSION['user']['id'];
+    log_activity('logout', activity_user_label($uid, $_SESSION['user']['username']) . ' keluar dari sistem', $uid);
 }
 
 session_destroy();

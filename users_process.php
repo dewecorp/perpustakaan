@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO users (name, username, password, avatar, role) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$name, $username, $hash, $avatarPath, $role]);
             
-            log_activity('create', 'Menambah pengguna baru: ' . $username);
+            log_activity('create', activity_user_label() . ' menambahkan pengguna baru: ' . $username);
             $_SESSION['success'] = "Pengguna berhasil ditambahkan.";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Gagal menambahkan pengguna: " . $e->getMessage();
@@ -110,7 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare($sql);
             $stmt->execute($params);
-            log_activity('update', 'Mengubah data pengguna: ' . $username);
+            log_activity('update', activity_user_label() . ' memperbarui data pengguna: ' . $username);
             $_SESSION['success'] = "Pengguna berhasil diperbarui.";
         } catch (PDOException $e) {
             $_SESSION['error'] = "Gagal memperbarui pengguna: " . $e->getMessage();
@@ -143,7 +143,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
             $stmt->execute([$id]);
-            log_activity('delete', 'Menghapus pengguna: ' . $user['username']);
+            log_activity('delete', activity_user_label() . ' menghapus pengguna: ' . $user['username']);
             $_SESSION['success'] = "Pengguna berhasil dihapus.";
         }
     } catch (PDOException $e) {

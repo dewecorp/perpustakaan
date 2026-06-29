@@ -3,16 +3,11 @@ require_once 'config/config.php';
 require_login();
 $pdo = db();
 
-// Clean old activities
 clean_old_activities();
-
-// Get total activity count
+clean_old_visitors();
 $totalActivities = $pdo->query("SELECT COUNT(*) FROM activity_logs")->fetchColumn();
-
-// Fetch recent activities
 $activities = $pdo->query("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 100")->fetchAll();
 
-// Statistics
 $stats = [
     'categories' => $pdo->query("SELECT COUNT(*) FROM categories")->fetchColumn(),
     'books' => $pdo->query("SELECT COUNT(*) FROM books")->fetchColumn(),
@@ -20,8 +15,6 @@ $stats = [
     'users' => $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(),
 ];
 
-// Visitor Chart Data (Last 12 Months)
-// 1. Fetch raw data keyed by period (YYYY-MM)
 $rawData = $pdo->query("
     SELECT DATE_FORMAT(visit_date, '%Y-%m') as period, COUNT(*) as count 
     FROM visitors 
@@ -29,248 +22,228 @@ $rawData = $pdo->query("
     GROUP BY period 
 ")->fetchAll(PDO::FETCH_KEY_PAIR);
 
-// 2. Generate complete 12 months list filling missing months with 0
 $chartData = [];
-// Use first day of current month as base to avoid "31st" edge cases
-$baseDate = strtotime(date('Y-m-01')); 
+$baseDate = strtotime(date('Y-m-01'));
 for ($i = 11; $i >= 0; $i--) {
     $timestamp = strtotime("-$i months", $baseDate);
     $date = date('Y-m', $timestamp);
     $chartData[] = [
-        'period' => $date,
-        'label' => date('M Y', $timestamp),
+        'label' => format_month_year_id($timestamp),
         'count' => isset($rawData[$date]) ? (int)$rawData[$date] : 0
     ];
 }
 
+$categoryPieData = $pdo->query("
+    SELECT
+        COALESCE(NULLIF(b.category, ''), 'Tanpa Kategori') AS category,
+        COUNT(*) AS total
+    FROM visitors v
+    INNER JOIN books b ON b.id = v.book_id
+    WHERE v.book_id IS NOT NULL
+      AND (v.purpose LIKE 'Melihat Buku:%' OR v.purpose LIKE 'Mengunduh Buku:%')
+    GROUP BY COALESCE(NULLIF(b.category, ''), 'Tanpa Kategori')
+    HAVING total > 0
+    ORDER BY total DESC
+    LIMIT 8
+")->fetchAll();
+
+if (empty($categoryPieData)) {
+    $categoryPieData = $pdo->query("
+        SELECT
+            COALESCE(NULLIF(category, ''), 'Tanpa Kategori') AS category,
+            SUM(COALESCE(views, 0) + COALESCE(downloads, 0)) AS total
+        FROM books
+        GROUP BY COALESCE(NULLIF(category, ''), 'Tanpa Kategori')
+        HAVING total > 0
+        ORDER BY total DESC
+        LIMIT 8
+    ")->fetchAll();
+}
+
 $pageTitle = "Dashboard";
+$pageSubtitle = "Ringkasan statistik perpustakaan";
 $activePage = 'dashboard';
 
 include 'template/header.php';
 include 'template/sidebar.php';
 ?>
-<div class="pcoded-content">
-    <div class="pcoded-inner-content">
-        <div class="main-body">
-            <div class="page-wrapper">
-                <div class="page-header card">
-                    <div class="row align-items-end">
-                        <div class="col-lg-8">
-                            <div class="page-header-title">
-                                <i class="icofont icofont-home bg-c-blue"></i>
-                                <div class="d-inline">
-                                    <h4>Dashboard</h4>
-                                    <span>Ringkasan statistik perpustakaan</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="row">
-                        <!-- Categories Card -->
-                        <div class="col-md-6 col-xl-3">
-                            <div class="card widget-card-1">
-                                <div class="card-block-small">
-                                    <i class="icofont icofont-layers bg-c-blue card1-icon"></i>
-                                    <span class="text-c-blue f-w-600">Kategori Buku</span>
-                                    <h4><?php echo $stats['categories']; ?></h4>
-                                    <div>
-                                        <span class="f-left m-t-10 text-muted">
-                                            <i class="text-c-blue f-16 icofont icofont-warning m-r-10"></i>Total Kategori
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Books Card -->
-                        <div class="col-md-6 col-xl-3">
-                            <div class="card widget-card-1">
-                                <div class="card-block-small">
-                                    <i class="icofont icofont-book bg-c-pink card1-icon"></i>
-                                    <span class="text-c-pink f-w-600">Data Buku</span>
-                                    <h4><?php echo $stats['books']; ?></h4>
-                                    <div>
-                                        <span class="f-left m-t-10 text-muted">
-                                            <i class="text-c-pink f-16 icofont icofont-calendar m-r-10"></i>Total Buku
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Visitors Card -->
-                        <div class="col-md-6 col-xl-3">
-                            <div class="card widget-card-1">
-                                <div class="card-block-small">
-                                    <i class="icofont icofont-users-alt-5 bg-c-green card1-icon"></i>
-                                    <span class="text-c-green f-w-600">Pengunjung</span>
-                                    <h4><?php echo $stats['visitors']; ?></h4>
-                                    <div>
-                                        <span class="f-left m-t-10 text-muted">
-                                            <i class="text-c-green f-16 icofont icofont-tag m-r-10"></i>Total Pengunjung
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <!-- Users Card -->
-                        <div class="col-md-6 col-xl-3">
-                            <div class="card widget-card-1">
-                                <div class="card-block-small">
-                                    <i class="icofont icofont-ui-user bg-c-yellow card1-icon"></i>
-                                    <span class="text-c-yellow f-w-600">Pengguna</span>
-                                    <h4><?php echo $stats['users']; ?></h4>
-                                    <div>
-                                        <span class="f-left m-t-10 text-muted">
-                                            <i class="text-c-yellow f-16 icofont icofont-refresh m-r-10"></i>Total User
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-primary">
+            <div class="inner">
+                <h3><?php echo $stats['categories']; ?></h3>
+                <p>Kategori Buku</p>
+            </div>
+            <i class="small-box-icon bi bi-layers"></i>
+            <a href="<?php echo BASE_URL; ?>categories.php" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Lihat detail <i class="bi bi-link-45deg"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-danger">
+            <div class="inner">
+                <h3><?php echo $stats['books']; ?></h3>
+                <p>Data Buku</p>
+            </div>
+            <i class="small-box-icon bi bi-book"></i>
+            <a href="<?php echo BASE_URL; ?>books.php" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Lihat detail <i class="bi bi-link-45deg"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-success">
+            <div class="inner">
+                <h3><?php echo $stats['visitors']; ?></h3>
+                <p>Pengunjung</p>
+            </div>
+            <i class="small-box-icon bi bi-people"></i>
+            <a href="<?php echo BASE_URL; ?>visitors.php" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Lihat detail <i class="bi bi-link-45deg"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-warning">
+            <div class="inner">
+                <h3><?php echo $stats['users']; ?></h3>
+                <p>Pengguna</p>
+            </div>
+            <i class="small-box-icon bi bi-person-badge"></i>
+            <a href="<?php echo BASE_URL; ?>users.php" class="small-box-footer link-dark link-underline-opacity-0 link-underline-opacity-50-hover">
+                Lihat detail <i class="bi bi-link-45deg"></i>
+            </a>
+        </div>
+    </div>
+</div>
 
-                        <!-- Statistics Chart -->
-                        <div class="col-md-12 col-xl-12">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5>Statistik Pengunjung (1 Tahun Terakhir)</h5>
-                                    <div class="card-header-right">
-                                        <ul class="list-unstyled card-option">
-                                            <li><i class="icofont icofont-simple-left "></i></li>
-                                            <li><i class="icofont icofont-maximize full-card"></i></li>
-                                            <li><i class="icofont icofont-minus minimize-card"></i></li>
-                                            <li><i class="icofont icofont-refresh reload-card"></i></li>
-                                            <li><i class="icofont icofont-error close-card"></i></li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <div class="card-block">
-                                    <div id="visitorChart" style="height:400px;"></div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Activity Log -->
-                        <div class="col-md-12 col-xl-12">
-                            <style>
-                                .activity-log .row {
-                                    position: relative;
-                                }
-                                .activity-log .row:not(:last-child)::before {
-                                    content: "";
-                                    position: absolute;
-                                    top: 35px;
-                                    left: 35px;
-                                    width: 2px;
-                                    height: calc(100% - 10px);
-                                    background: #f1f1f1;
-                                    z-index: 1;
-                                }
-                                .icon-circle {
-                                    width: 40px;
-                                    height: 40px;
-                                    border-radius: 50%;
-                                    text-align: center;
-                                    line-height: 40px;
-                                    position: relative;
-                                    z-index: 2;
-                                    display: inline-block;
-                                    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-                                }
-                                .icon-circle i {
-                                    color: #fff;
-                                    font-size: 20px;
-                                    line-height: 40px;
-                                }
-                            </style>
-                            <div class="card">
-                                <div class="card-header">
-                                    <h5>Aktivitas Pengguna (Total: <?php echo $totalActivities; ?>)</h5>
-                                </div>
-                                <div class="card-block p-0">
-                                    <div class="table-responsive" style="max-height: 460px; overflow-y: auto;">
-                                        <div class="p-20 activity-log">
-                                            <?php if (empty($activities)): ?>
-                                                <p class="text-center text-muted">Belum ada aktivitas.</p>
-                                            <?php else: ?>
-                                                <?php foreach ($activities as $log): 
-                                                    $icon = 'icofont-info-circle';
-                                                    $bgClass = 'bg-primary';
-                                                    
-                                                    switch($log['action_type']) {
-                                                        case 'login': 
-                                                            $icon = 'icofont-login'; 
-                                                            $bgClass = 'bg-c-green';
-                                                            break;
-                                                        case 'logout': 
-                                                            $icon = 'icofont-logout'; 
-                                                            $bgClass = 'bg-c-pink'; 
-                                                            break;
-                                                        case 'create': 
-                                                            $icon = 'icofont-plus'; 
-                                                            $bgClass = 'bg-c-blue';
-                                                            break;
-                                                        case 'update': 
-                                                            $icon = 'icofont-edit'; 
-                                                            $bgClass = 'bg-c-yellow';
-                                                            break;
-                                                        case 'delete': 
-                                                            $icon = 'icofont-ui-delete'; 
-                                                            $bgClass = 'bg-c-pink';
-                                                            break;
-                                                    }
-                                                ?>
-                                                <div class="row m-b-25">
-                                                    <div class="col-auto p-r-0">
-                                                        <div class="u-img" style="padding-left: 15px;">
-                                                            <div class="icon-circle <?php echo $bgClass; ?>">
-                                                                <i class="icofont <?php echo $icon; ?>"></i>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col">
-                                                        <h6 class="m-b-5"><?php echo htmlspecialchars($log['description']); ?></h6>
-                                                        <p class="text-muted m-b-0">
-                                                            <i class="icofont icofont-clock-time"></i> 
-                                                            <?php echo time_ago($log['created_at']); ?>
-                                                            <span class="f-right text-muted f-10"><?php echo htmlspecialchars($log['username']); ?></span>
-                                                        </p>
-                                                        <p class="text-muted m-b-0 f-10"><?php echo date('d M Y H:i', strtotime($log['created_at'])); ?></p>
-                                                    </div>
-                                                </div>
-                                                <?php endforeach; ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Statistik Pengunjung (1 Tahun Terakhir)</h3>
+            </div>
+            <div class="card-body">
+                <div id="visitorChart" style="height:400px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h3 class="card-title">Kategori Paling Dikunjungi</h3>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <?php if (empty($categoryPieData)): ?>
+                    <p class="text-muted text-center mb-0 small">Belum ada kunjungan ke koleksi buku saat ini.<br>Buka katalog publik dan lihat/unduh buku untuk mengisi grafik.</p>
+                <?php else: ?>
+                    <div id="categoryPieChart" class="w-100" style="height:400px;"></div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
 </div>
 
-<?php 
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Aktivitas Pengguna (Total: <?php echo $totalActivities; ?>)</h3>
+            </div>
+            <div class="card-body p-3" style="max-height:460px; overflow-y:auto;">
+                <?php if (empty($activities)): ?>
+                    <p class="text-center text-muted p-4">Belum ada aktivitas.</p>
+                <?php else: ?>
+                    <div class="timeline">
+                        <?php
+                        $lastDate = null;
+                        foreach ($activities as $log):
+                            $logDate = format_date_id($log['created_at']);
+                            if ($logDate !== $lastDate):
+                                $lastDate = $logDate;
+                        ?>
+                        <div class="time-label">
+                            <span class="text-bg-primary"><?php echo $logDate; ?></span>
+                        </div>
+                        <?php
+                            endif;
+                            $meta = activity_timeline_meta($log['action_type'] ?? '');
+                            $actor = activity_user_label(
+                                isset($log['user_id']) ? (int)$log['user_id'] : null,
+                                $log['username'] ?? null
+                            );
+                            $action = activity_action_text($log);
+                        ?>
+                        <div>
+                            <i class="timeline-icon bi <?php echo $meta['icon']; ?> <?php echo $meta['bg']; ?>"></i>
+                            <div class="timeline-item">
+                                <span class="time">
+                                    <i class="bi bi-clock-fill"></i>
+                                    <?php echo date('H:i', strtotime($log['created_at'])); ?>
+                                    &middot; <?php echo time_ago($log['created_at']); ?>
+                                </span>
+                                <h3 class="timeline-header no-border mb-0">
+                                    <span class="fw-semibold"><?php echo htmlspecialchars($actor); ?></span>
+                                    <?php echo ' ' . htmlspecialchars($action); ?>
+                                </h3>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <div>
+                            <i class="timeline-icon bi bi-clock-fill text-bg-secondary"></i>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php
 $extra_js = '
-<!-- Morris Chart Dependencies -->
-<script src="assets/js/raphael/raphael.min.js"></script>
-<script src="assets/js/morris.js/morris.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.37.1/dist/apexcharts.min.js"></script>
 <script>
-$(document).ready(function() {
-    Morris.Bar({
-        element: "visitorChart",
-        data: ' . json_encode($chartData) . ',
-        xkey: "label",
-        ykeys: ["count"],
-        labels: ["Pengunjung"],
-        barColors: ["#FC6180"],
-        hideHover: "auto",
-        resize: true
-    });
+document.addEventListener("DOMContentLoaded", function() {
+    var chartData = ' . json_encode($chartData) . ';
+    new ApexCharts(document.querySelector("#visitorChart"), {
+        series: [{ name: "Pengunjung", data: chartData.map(function(d) { return d.count; }) }],
+        chart: { type: "bar", height: 400, toolbar: { show: false } },
+        plotOptions: { bar: { borderRadius: 4, columnWidth: "55%" } },
+        colors: ["#0d6efd"],
+        xaxis: { categories: chartData.map(function(d) { return d.label; }) },
+        dataLabels: { enabled: false }
+    }).render();
+
+    var pieData = ' . json_encode($categoryPieData) . ';
+    if (pieData.length && document.querySelector("#categoryPieChart")) {
+        new ApexCharts(document.querySelector("#categoryPieChart"), {
+            series: pieData.map(function(d) { return parseInt(d.total, 10); }),
+            chart: { type: "donut", height: 400 },
+            labels: pieData.map(function(d) { return d.category; }),
+            colors: ["#0d6efd", "#20c997", "#ffc107", "#dc3545", "#6f42c1", "#fd7e14", "#198754", "#6c757d"],
+            legend: { position: "bottom", fontSize: "12px" },
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: "65%",
+                        labels: {
+                            show: true,
+                            total: {
+                                show: true,
+                                label: "Total",
+                                formatter: function(w) {
+                                    return w.globals.seriesTotals.reduce(function(a, b) { return a + b; }, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            dataLabels: { enabled: true, formatter: function(val) { return Math.round(val) + "%"; } }
+        }).render();
+    }
 });
 </script>
 ';
-include 'template/footer.php'; 
-?>
+include 'template/footer.php';

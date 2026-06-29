@@ -4,215 +4,172 @@ require_login();
 require_admin();
 $pdo = db();
 
-// Fetch users
 $users = $pdo->query("SELECT * FROM users ORDER BY created_at DESC")->fetchAll();
 
 $pageTitle = "Manajemen Pengguna";
+$pageSubtitle = "Kelola akun pengguna sistem";
 $activePage = 'users';
+$pageActions = '<button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="bi bi-plus-lg me-1"></i> Tambah Pengguna</button>';
+
 include 'template/header.php';
 include 'template/sidebar.php';
 ?>
-<!-- Content -->
-<div class="pcoded-content">
-    <div class="pcoded-inner-content">
-        <div class="main-body">
-            <div class="page-wrapper">
-                <div class="page-header card">
-                    <div class="row align-items-end">
-                        <div class="col-lg-8">
-                            <div class="page-header-title">
-                                <i class="icofont icofont-users-alt-5 bg-c-pink"></i>
-                                <div class="d-inline">
-                                    <h4>Manajemen Pengguna</h4>
-                                    <span>Kelola akun pengguna sistem</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="page-body">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Daftar Pengguna</h5>
-                            <button class="btn btn-primary float-right" data-toggle="modal" data-target="#addUserModal"><i class="ti-plus"></i> Tambah Pengguna</button>
-                        </div>
-                        <div class="card-block">
-                            <div class="dt-responsive table-responsive">
-                                <table class="table table-striped table-bordered nowrap">
-                                    <thead>
-                                        <tr>
-                                            <th>No</th>
-                                            <th>Foto</th>
-                                            <th>Nama</th>
-                                            <th>Username</th>
-                                            <th>Level</th>
-                                            <th>Password</th>
-                                            <th>Aksi</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach($users as $i => $u): ?>
-                                        <tr>
-                                            <td><?= $i+1 ?></td>
-                                            <td>
-                                                <?php 
-                                                if (!empty($u['avatar']) && file_exists($u['avatar'])) {
-                                                    $avatarUrl = $u['avatar'];
-                                                } else {
-                                                    $avatarUrl = 'https://ui-avatars.com/api/?name='.urlencode($u['name']).'&background=random&color=fff&size=50';
-                                                }
-                                                ?>
-                                                <img src="<?= $avatarUrl ?>" alt="Avatar" class="img-radius" width="40" height="40" style="object-fit:cover;">
-                                            </td>
-                                            <td><?= htmlspecialchars($u['name']) ?></td>
-                                            <td><?= htmlspecialchars($u['username']) ?></td>
-                                            <td>
-                                                <?php 
-                                                $roleLabel = ($u['role'] ?? 'admin') === 'pustakawan' ? 'Pustakawan' : 'Admin';
-                                                echo htmlspecialchars($roleLabel);
-                                                ?>
-                                            </td>
-                                            <td>********</td>
-                                            <td>
-                                                <button class="btn btn-warning btn-sm btn-edit" 
-                                                    data-id="<?= $u['id'] ?>" 
-                                                    data-name="<?= htmlspecialchars($u['name']) ?>"
-                                                    data-username="<?= htmlspecialchars($u['username']) ?>"
-                                                    data-role="<?= htmlspecialchars($u['role'] ?? 'admin') ?>"
-                                                    data-toggle="modal" data-target="#editUserModal">
-                                                    <i class="ti-pencil"></i> Edit
-                                                </button>
-                                                <?php if($u['id'] != 1): ?>
-                                                <button class="btn btn-danger btn-sm btn-delete" data-id="<?= $u['id'] ?>">
-                                                    <i class="ti-trash"></i> Hapus
-                                                </button>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Daftar Pengguna</h3>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-bordered nowrap">
+                <thead>
+                    <tr>
+                        <th>No</th>
+                        <th>Foto</th>
+                        <th>Nama</th>
+                        <th>Username</th>
+                        <th>Level</th>
+                        <th>Password</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($users as $i => $u): ?>
+                    <tr>
+                        <td><?php echo $i + 1; ?></td>
+                        <td>
+                            <?php
+                            if (!empty($u['avatar']) && file_exists($u['avatar'])) {
+                                $avatarUrl = $u['avatar'];
+                            } else {
+                                $avatarUrl = 'https://ui-avatars.com/api/?name=' . urlencode($u['name']) . '&background=random&color=fff&size=50';
+                            }
+                            ?>
+                            <img src="<?php echo htmlspecialchars($avatarUrl); ?>" alt="Avatar" class="rounded-circle" width="40" height="40" style="object-fit:cover;">
+                        </td>
+                        <td><?php echo htmlspecialchars($u['name']); ?></td>
+                        <td><?php echo htmlspecialchars($u['username']); ?></td>
+                        <td><?php echo htmlspecialchars(($u['role'] ?? 'admin') === 'pustakawan' ? 'Pustakawan' : 'Admin'); ?></td>
+                        <td>********</td>
+                        <td>
+                            <button class="btn btn-warning btn-sm btn-edit"
+                                data-id="<?php echo $u['id']; ?>"
+                                data-name="<?php echo htmlspecialchars($u['name']); ?>"
+                                data-username="<?php echo htmlspecialchars($u['username']); ?>"
+                                data-role="<?php echo htmlspecialchars($u['role'] ?? 'admin'); ?>"
+                                data-bs-toggle="modal" data-bs-target="#editUserModal">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                            <?php if ($u['id'] != 1): ?>
+                            <button class="btn btn-danger btn-sm btn-delete" data-id="<?php echo $u['id']; ?>">
+                                <i class="bi bi-trash"></i> Hapus
+                            </button>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- Add Modal -->
-<div class="modal fade" id="addUserModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+<div class="modal fade" id="addUserModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <form action="users_process.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="create">
                 <div class="modal-header">
                     <h5 class="modal-title">Tambah Pengguna</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>Nama Lengkap</label>
+                    <div class="mb-3">
+                        <label class="form-label">Nama Lengkap</label>
                         <input type="text" name="name" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Username</label>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
                         <input type="text" name="username" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Level</label>
-                        <select name="role" class="form-control">
+                    <div class="mb-3">
+                        <label class="form-label">Level</label>
+                        <select name="role" class="form-select">
                             <option value="admin">Admin</option>
                             <option value="pustakawan">Pustakawan</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Password</label>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
                         <input type="password" name="password" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Foto Avatar (Opsional)</label>
+                    <div class="mb-3">
+                        <label class="form-label">Foto Avatar (Opsional)</label>
                         <input type="file" name="avatar" class="form-control">
-                        <small class="text-muted">Jika kosong, akan menggunakan inisial nama.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default waves-effect " data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary waves-effect waves-light ">Simpan</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Edit Modal -->
-<div class="modal fade" id="editUserModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog" role="document">
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
             <form action="users_process.php" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update">
                 <input type="hidden" name="id" id="edit_id">
                 <div class="modal-header">
                     <h5 class="modal-title">Edit Pengguna</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label>Nama Lengkap</label>
+                    <div class="mb-3">
+                        <label class="form-label">Nama Lengkap</label>
                         <input type="text" name="name" id="edit_name" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Username</label>
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
                         <input type="text" name="username" id="edit_username" class="form-control" required>
                     </div>
-                    <div class="form-group">
-                        <label>Level</label>
-                        <select name="role" id="edit_role" class="form-control">
+                    <div class="mb-3">
+                        <label class="form-label">Level</label>
+                        <select name="role" id="edit_role" class="form-select">
                             <option value="admin">Admin</option>
                             <option value="pustakawan">Pustakawan</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label>Password (Kosongkan jika tidak diubah)</label>
+                    <div class="mb-3">
+                        <label class="form-label">Password (Kosongkan jika tidak diubah)</label>
                         <input type="password" name="password" class="form-control">
                     </div>
-                    <div class="form-group">
-                        <label>Ganti Foto Avatar</label>
+                    <div class="mb-3">
+                        <label class="form-label">Ganti Foto Avatar</label>
                         <input type="file" name="avatar" class="form-control">
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-default waves-effect " data-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary waves-effect waves-light ">Simpan Perubahan</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<?php 
+<?php
 $extra_js = '
 <script>
 $(document).ready(function() {
-    // Edit Button
     $(".btn-edit").on("click", function() {
-        var id = $(this).data("id");
-        var name = $(this).data("name");
-        var username = $(this).data("username");
-        var role = $(this).data("role") || "admin";
-        
-        $("#edit_id").val(id);
-        $("#edit_name").val(name);
-        $("#edit_username").val(username);
-        $("#edit_role").val(role);
+        $("#edit_id").val($(this).data("id"));
+        $("#edit_name").val($(this).data("name"));
+        $("#edit_username").val($(this).data("username"));
+        $("#edit_role").val($(this).data("role") || "admin");
     });
-
-    // Delete Button
     $(".btn-delete").on("click", function() {
         var id = $(this).data("id");
         Swal.fire({
@@ -220,8 +177,6 @@ $(document).ready(function() {
             text: "Data pengguna akan dihapus permanen!",
             icon: "warning",
             showCancelButton: true,
-            confirmButtonColor: "#d33",
-            cancelButtonColor: "#3085d6",
             confirmButtonText: "Ya, Hapus!",
             cancelButtonText: "Batal"
         }).then((result) => {
@@ -233,5 +188,4 @@ $(document).ready(function() {
 });
 </script>
 ';
-include 'template/footer.php'; 
-?>
+include 'template/footer.php';

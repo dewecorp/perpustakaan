@@ -21,26 +21,30 @@ if (!file_exists($fullPath)) {
   exit;
 }
 
-// Log visit (Melihat Buku)
+// Log visit (Melihat Buku) — lewati jika sudah dicatat via track_book.php
+$skipLog = isset($_GET['skip_log']) && $_GET['skip_log'] === '1';
+$bookIdParam = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+
+if (!$skipLog) {
 try {
-    // Get book title
-    $stmt = $pdo->prepare("SELECT title FROM books WHERE book_path = ?");
-    $stmt->execute([$path]);
-    $book = $stmt->fetch();
-    $title = $book['title'] ?? basename($path);
-
-    // Determine visitor name
-    $visitorName = isset($_SESSION['user']) ? $_SESSION['user']['username'] : 'Tamu (' . $_SERVER['REMOTE_ADDR'] . ')';
-
-    // Insert log
-    $stmtLog = $pdo->prepare("INSERT INTO visitors (name, purpose) VALUES (?, ?)");
-    $stmtLog->execute([$visitorName, "Melihat Buku: " . $title]);
-
-    // Increment views
-    $stmtView = $pdo->prepare("UPDATE books SET views = views + 1 WHERE book_path = ?");
-    $stmtView->execute([$path]);
+    if ($bookIdParam > 0) {
+        $stmt = $pdo->prepare("SELECT * FROM books WHERE id = ?");
+        $stmt->execute([$bookIdParam]);
+        $book = $stmt->fetch();
+        if ($book) {
+            log_book_visit($book, 'view');
+        }
+    } else {
+        $stmt = $pdo->prepare("SELECT * FROM books WHERE book_path = ?");
+        $stmt->execute([$path]);
+        $book = $stmt->fetch();
+        if ($book) {
+            log_book_visit($book, 'view');
+        }
+    }
 } catch (Exception $e) {
     // Ignore logging errors to not break functionality
+}
 }
 ?>
 <!DOCTYPE html>

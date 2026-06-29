@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['book_url'] ?? '',
                 $_POST['description']
             ]);
-            log_activity('create', 'Menambah buku baru: ' . $_POST['title']);
+            log_activity('create', activity_user_label() . ' menambahkan buku baru: ' . $_POST['title']);
             $_SESSION['success'] = "Buku berhasil ditambahkan.";
             header('Location: ' . BASE_URL . 'books.php');
         } catch (PDOException $e) {
@@ -120,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_POST['description'],
                 $_POST['id']
             ]);
-            log_activity('update', 'Mengubah data buku: ' . $_POST['title']);
+            log_activity('update', activity_user_label() . ' memperbarui data buku: ' . $_POST['title']);
             $_SESSION['success'] = "Buku berhasil diubah.";
             header('Location: ' . BASE_URL . 'books.php');
         } catch (PDOException $e) {
@@ -135,7 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare("DELETE FROM books WHERE id=?");
         $stmt->execute([$_POST['id']]);
         
-        log_activity('delete', 'Menghapus buku: ' . $title);
+        log_activity('delete', activity_user_label() . ' menghapus buku: ' . $title);
         $_SESSION['success'] = "Buku berhasil dihapus.";
         header('Location: ' . BASE_URL . 'books.php');
     }

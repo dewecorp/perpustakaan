@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($nama_kategori)) {
             $stmt = $pdo->prepare("INSERT INTO categories (nama_kategori) VALUES (?)");
             $stmt->execute([$nama_kategori]);
-            log_activity('create', 'Menambah kategori: ' . $nama_kategori);
+            log_activity('create', activity_user_label() . ' menambahkan kategori: ' . $nama_kategori);
             $_SESSION['success'] = "Kategori berhasil ditambahkan";
         } else {
             $_SESSION['error'] = "Nama kategori tidak boleh kosong";
@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!empty($id) && !empty($nama_kategori)) {
             $stmt = $pdo->prepare("UPDATE categories SET nama_kategori = ? WHERE id = ?");
             $stmt->execute([$nama_kategori, $id]);
-            log_activity('update', 'Mengubah kategori: ' . $nama_kategori);
+            log_activity('update', activity_user_label() . ' memperbarui kategori: ' . $nama_kategori);
             $_SESSION['success'] = "Kategori berhasil diperbarui";
         } else {
             $_SESSION['error'] = "Data tidak valid";
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
             $stmt->execute([$id]);
-            log_activity('delete', 'Menghapus kategori: ' . $name);
+            log_activity('delete', activity_user_label() . ' menghapus kategori: ' . $name);
             $_SESSION['success'] = "Kategori berhasil dihapus";
         } else {
             $_SESSION['error'] = "ID tidak valid";

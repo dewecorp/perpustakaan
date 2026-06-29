@@ -249,50 +249,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+$pageTitle = 'Impor Buku';
+$pageSubtitle = 'Tarik data buku dari berbagai situs ebook (SIBI, Kemdikbud, madrasah, dan lainnya)';
+$activePage = 'sibi_import';
 include __DIR__ . '/template/header.php';
 include __DIR__ . '/template/sidebar.php';
 ?>
-<div class="pcoded-content">
-    <div class="pcoded-inner-content">
-        <div class="main-body">
-            <div class="page-wrapper">
-                <div class="page-header card">
-                    <div class="row align-items-end">
-                        <div class="col-lg-8">
-                            <div class="page-header-title">
-                                <i class="icofont icofont-cloud-download bg-c-blue"></i>
-                                <div class="d-inline">
-                                    <h4>Impor Buku</h4>
-                                    <span>Tarik data buku dari berbagai situs ebook (SIBI, Kemdikbud, madrasah, dan lainnya).</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="page-body">
-                    <div class="card">
-                        <div class="card-header">
-                            <h5>Ambil Data</h5>
-                        </div>
-                        <div class="card-block">
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Ambil Data</h3>
+    </div>
+    <div class="card-body">
                             <?php if ($message): ?>
                                 <div class="alert alert-warning"><?php echo htmlspecialchars($message); ?></div>
                             <?php endif; ?>
                             <form method="POST" class="mb-4">
                                 <input type="hidden" name="action" value="fetch">
-                                <div class="form-group">
-                                    <label>URL Daftar Buku (opsional)</label>
+                                <div class="mb-3">
+                                    <label class="form-label">URL Daftar Buku (opsional)</label>
                                     <input type="url" name="listing_url" class="form-control" placeholder="https://buku.kemendikdasmen.go.id/...">
                                     <small class="text-muted">Isi dengan halaman daftar buku dari situs mana pun. Jika tidak berhasil, gunakan daftar URL detail buku di bawah.</small>
                                 </div>
-                                <div class="form-group">
-                                    <label>Daftar URL Detail Buku (opsional) - satu per baris</label>
+                                <div class="mb-3">
+                                    <label class="form-label">Daftar URL Detail Buku (opsional) - satu per baris</label>
                                     <textarea name="detail_urls" class="form-control" rows="4" placeholder="https://buku.kemendikdasmen.go.id/buku/..."></textarea>
                                 </div>
-                                <div class="form-row">
-                                    <div class="col-md-3 form-group">
-                                        <label>Batas Maksimal</label>
+                                <div class="row">
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">Batas Maksimal</label>
                                         <input type="number" name="limit" class="form-control" value="20" min="1" max="100">
                                     </div>
                                 </div>
@@ -335,11 +319,6 @@ include __DIR__ . '/template/sidebar.php';
                                     <button type="submit" class="btn btn-success">Import Semua</button>
                                 </form>
                             <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 <?php

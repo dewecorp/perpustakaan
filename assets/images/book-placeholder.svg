@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 420" role="img" aria-label="Sampul buku">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e3f2fd"/>
+      <stop offset="100%" style="stop-color:#bbdefb"/>
+    </linearGradient>
+    <linearGradient id="spine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0d47a1"/>
+      <stop offset="100%" style="stop-color:#1976d2"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff"/>
+      <stop offset="100%" style="stop-color:#f5f5f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="420" fill="url(#bg)"/>
+  <rect x="0" y="0" width="28" height="420" fill="url(#spine)"/>
+  <rect x="36" y="24" width="248" height="372" rx="6" fill="url(#page)" stroke="#90caf9" stroke-width="2"/>
+  <g transform="translate(150,175)" fill="#1976d2">
+    <path d="M-40,-8c-8,0-14,6-14,14v56c0,8,6,14,14,14h12v-84H-40z" opacity="0.9"/>
+    <path d="M-28,-8h56c8,0,14,6,14,14v56c0,8-6,14-14,14H-28V-8z" opacity="0.7"/>
+    <path d="M-20,20h40M-20,36h32M-20,52h36" stroke="#64b5f6" stroke-width="3" stroke-linecap="round" fill="none"/>
+  </g>
+  <text x="150" y="320" text-anchor="middle" font-family="system-ui,sans-serif" font-size="15" font-weight="600" fill="#1565c0">BUKU</text>
+</svg>
