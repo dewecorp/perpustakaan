@@ -179,15 +179,23 @@ function same_host($url, $baseUrl): bool {
 function is_book_listing_url($url): bool {
     $url = strtolower((string)$url);
     $path = strtolower((string)(parse_url($url, PHP_URL_PATH) ?? ''));
+    $query = strtolower((string)(parse_url($url, PHP_URL_QUERY) ?? ''));
 
     $listingPatterns = [
         '#/kategori/#i',
         '#/category/#i',
         '#/categories/#i',
+        '#/catalog(?:/|$)#i',
+        '#/catalogue(?:/|$)#i',
+        '#/katalog(?:/|$)#i',
+        '#/koleksi(?:/|$)#i',
+        '#/konten/list/detail/#i',
+        '#/collections?(?:/|$)#i',
         '#/tag/#i',
         '#/tags/#i',
         '#/search#i',
         '#/cari#i',
+        '#/pencarian#i',
         '#/video/#i',
         '#/mading/#i',
         '#/publik/?$#i',
@@ -197,6 +205,10 @@ function is_book_listing_url($url): bool {
         if (preg_match($pattern, $url) || preg_match($pattern, $path)) {
             return true;
         }
+    }
+
+    if ($query !== '' && preg_match('#\b(q|query|keyword|search|cari|kategori|category|page)=#i', $query)) {
+        return true;
     }
 
     return false;
@@ -216,11 +228,18 @@ function is_book_detail_url($url): bool {
         '#/publik/buku_detail/\d+#i',
         '#/buku_detail/\d+#i',
         '#/detail(?:/buku)?/\d+#i',
+        '#/detail(?:/buku)?/[^/?#]+#i',
+        '#/book(?:s)?/detail/[^/?#]+#i',
+        '#/buku/[^/?#]+/detail#i',
+        '#/koleksi/[^/?#]+/detail#i',
         '#/ebook/\d+#i',
         '#/modul/\d+#i',
         '#/item/\d+#i',
         '#/read/\d+#i',
-        '~/(?:katalog|buku|ebook|modul|baca|read)/[^/?#]+~i',
+        '#/viewer/[^/?#]+#i',
+        '#/reader/[^/?#]+#i',
+        '~/(?:buku|book|books|ebook|modul)/[^/?#]+~i',
+        '~/(?:baca|read)/[^/?#]+~i',
         '~/download/[^/?#]+~i',
     ];
     foreach ($detailPatterns as $pattern) {
@@ -257,29 +276,53 @@ function score_detail_link($url): int {
 }
 
 function absolute_url($base, $rel) {
+    $rel = trim((string)$rel);
     if (preg_match('#^https?://#i', $rel)) return $rel;
+    if (strpos($rel, '//') === 0) {
+        $scheme = parse_url((string)$base, PHP_URL_SCHEME) ?: 'https';
+        return $scheme . ':' . $rel;
+    }
     $p = parse_url($base);
     $scheme = $p['scheme'] ?? 'https';
     $host = $p['host'] ?? '';
     $path = rtrim(dirname($p['path'] ?? '/'), '/');
+    if ($rel === '') return $scheme . '://' . $host . ($p['path'] ?? '/');
     if (strpos($rel, '/') === 0) return $scheme . '://' . $host . $rel;
+    if (strpos($rel, '?') === 0) return $scheme . '://' . $host . ($p['path'] ?? '/') . $rel;
     return $scheme . '://' . $host . $path . '/' . $rel;
+}
+
+function normalize_scraped_url(string $url): string {
+    $url = trim(html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    $url = str_replace(['\\/', '\\u002F'], '/', $url);
+    $url = preg_replace('/[\s\)\],;]+$/', '', $url);
+    return trim($url, " \t\n\r\0\x0B\"'");
 }
 
 function collect_href_links($baseUrl, $html): array {
     $links = [];
-    if (preg_match_all('#\b(?:href|to)=["\']([^"\']+)["\']#i', $html, $matches)) {
+    if (preg_match_all('#\b(?:href|to|data-url|data-href|data-link|data-detail|data-target|data-src)=["\']([^"\']+)["\']#i', $html, $matches)) {
         foreach ($matches[1] as $href) {
-            $href = trim(html_entity_decode($href));
+            $href = normalize_scraped_url($href);
             if ($href === '' || $href === '#' || stripos($href, 'javascript:') === 0) {
                 continue;
             }
             $links[] = absolute_url($baseUrl, $href);
         }
     }
-    if (preg_match_all('#/(?:publik/)?buku_detail/\d+#i', $html, $inline)) {
+
+    if (preg_match_all('#https?:\\?/\\?/[^"\'\s<>]+#i', $html, $absoluteMatches)) {
+        foreach ($absoluteMatches[0] as $rawUrl) {
+            $candidate = normalize_scraped_url($rawUrl);
+            if ($candidate !== '') {
+                $links[] = $candidate;
+            }
+        }
+    }
+
+    if (preg_match_all('#/(?:publik/)?(?:buku_detail|detail/buku|detail|book/detail|books/detail|konten/list/detail)/[A-Za-z0-9._~%+\-]+#i', $html, $inline)) {
         foreach ($inline[0] as $path) {
-            $links[] = absolute_url($baseUrl, $path);
+            $links[] = absolute_url($baseUrl, normalize_scraped_url($path));
         }
     }
     return array_values(array_unique($links));
@@ -303,8 +346,144 @@ function parse_listing_links($baseUrl, $html) {
     return $links;
 }
 
+function first_non_empty_value(array $row, array $keys): string {
+    foreach ($keys as $key) {
+        if (!array_key_exists($key, $row)) {
+            continue;
+        }
+        $value = $row[$key];
+        if (is_array($value)) {
+            if (isset($value['name']) || isset($value['title']) || isset($value['url'])) {
+                $value = $value['name'] ?? $value['title'] ?? $value['url'];
+            } else {
+                continue;
+            }
+        }
+        $value = trim((string)$value);
+        if ($value !== '') {
+            return $value;
+        }
+    }
+    return '';
+}
+
+function collect_json_book_previews($baseUrl, $node, array &$books): void {
+    if (!is_array($node)) {
+        return;
+    }
+
+    $title = first_non_empty_value($node, ['title', 'judul', 'name', 'nama', 'nama_buku', 'book_title', 'judul_buku']);
+    $rawUrl = first_non_empty_value($node, ['detail_url', 'detailUrl', 'url', 'link', 'href', 'permalink', 'web_url', 'read_url', 'reader_url']);
+    $slug = first_non_empty_value($node, ['slug', 'id', 'book_id', 'buku_id']);
+    if ($rawUrl === '' && $slug !== '' && !preg_match('#^\d+$#', $slug)) {
+        $rawUrl = $slug;
+    }
+
+    if ($title !== '' && $rawUrl !== '') {
+        $detailUrl = absolute_url($baseUrl, normalize_scraped_url($rawUrl));
+        if (same_host($detailUrl, $baseUrl) && is_book_detail_url($detailUrl)) {
+            $cover = first_non_empty_value($node, ['cover_url', 'coverUrl', 'cover', 'sampul', 'image', 'image_url', 'thumbnail', 'thumbnail_url', 'poster']);
+            $download = first_non_empty_value($node, ['download_url', 'downloadUrl', 'pdf_url', 'pdfUrl']);
+            $books[$detailUrl] = [
+                'title' => trim(html_entity_decode(strip_tags($title))),
+                'author' => first_non_empty_value($node, ['author', 'penulis', 'pengarang', 'creator', 'publisher']),
+                'isbn' => first_non_empty_value($node, ['isbn', 'ISBN']),
+                'year' => first_non_empty_value($node, ['year', 'tahun', 'published_year', 'tahun_terbit']),
+                'jenjang' => first_non_empty_value($node, ['jenjang', 'level']),
+                'kurikulum' => first_non_empty_value($node, ['kurikulum', 'curriculum']),
+                'cover_url' => $cover !== '' ? absolute_url($baseUrl, normalize_scraped_url($cover)) : '',
+                'read_url' => $detailUrl,
+                'download_url' => $download !== '' ? absolute_url($baseUrl, normalize_scraped_url($download)) : '',
+                'detail_url' => $detailUrl,
+            ];
+        }
+    }
+
+    foreach ($node as $child) {
+        if (is_array($child)) {
+            collect_json_book_previews($baseUrl, $child, $books);
+        }
+    }
+}
+
+function parse_json_previews($baseUrl, $html): array {
+    $books = [];
+    $trimmed = trim((string)$html);
+    if ($trimmed !== '' && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
+        $decoded = json_decode($trimmed, true);
+        if (is_array($decoded)) {
+            collect_json_book_previews($baseUrl, $decoded, $books);
+        }
+    }
+    if (preg_match_all('#<script[^>]*>(.*?)</script>#is', $html, $scripts)) {
+        foreach ($scripts[1] as $script) {
+            $script = trim(html_entity_decode($script, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            if ($script === '' || stripos($script, '{') === false) {
+                continue;
+            }
+            $jsonCandidates = [];
+            if (preg_match('#^\s*(\{.*\}|\[.*\])\s*$#s', $script, $m)) {
+                $jsonCandidates[] = $m[1];
+            }
+            if (preg_match('#self\.__next_f\.push\(\s*\[(.*?)\]\s*\)#s', $script, $mNext)) {
+                $jsonCandidates[] = '[' . $mNext[1] . ']';
+            }
+            foreach ($jsonCandidates as $rawJson) {
+                $decoded = json_decode($rawJson, true);
+                if (is_array($decoded)) {
+                    collect_json_book_previews($baseUrl, $decoded, $books);
+                }
+            }
+        }
+    }
+    return array_values($books);
+}
+
 function parse_listing_previews($baseUrl, $html): array {
     $books = [];
+
+    foreach (parse_json_previews($baseUrl, $html) as $jsonBook) {
+        if (!empty($jsonBook['detail_url'])) {
+            $books[$jsonBook['detail_url']] = $jsonBook;
+        }
+    }
+
+    if (preg_match_all('#<a\b[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)</a>#is', $html, $anchors, PREG_SET_ORDER)) {
+        foreach ($anchors as $anchor) {
+            $detailUrl = absolute_url($baseUrl, normalize_scraped_url($anchor[1]));
+            if (!same_host($detailUrl, $baseUrl) || !is_book_detail_url($detailUrl)) {
+                continue;
+            }
+            $inner = $anchor[2];
+            $title = '';
+            if (preg_match('#\b(?:alt|title)=["\']([^"\']{3,})["\']#i', $inner, $mTitle)) {
+                $title = trim(html_entity_decode(strip_tags($mTitle[1])));
+            }
+            if ($title === '') {
+                $title = trim(html_entity_decode(strip_tags($inner)));
+                $title = preg_replace('/\s+/u', ' ', $title);
+            }
+            if ($title === '' || is_generic_page_title($title) || preg_match('#^(lihat|baca|unduh|download|read|detail)\b#i', $title)) {
+                continue;
+            }
+            $cover = '';
+            if (preg_match('#<img[^>]+src=["\']([^"\']+)["\']#i', $inner, $mImg)) {
+                $cover = absolute_url($baseUrl, normalize_scraped_url($mImg[1]));
+            }
+            $books[$detailUrl] = [
+                'title' => $title,
+                'author' => '',
+                'isbn' => '',
+                'year' => '',
+                'jenjang' => '',
+                'kurikulum' => '',
+                'cover_url' => $cover,
+                'read_url' => $detailUrl,
+                'download_url' => '',
+                'detail_url' => $detailUrl,
+            ];
+        }
+    }
 
     // Rak buku digital (contoh: bookshelf / bs-shelf-image): detail link + cover + judul di textbox
     if (preg_match_all(
@@ -778,6 +957,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Proses URL kategori/daftar terlebih dahulu.
         foreach (array_keys($listingUrls) as $listingUrl) {
             $fetched = fetch_listing_books($listingUrl, $limit);
+            if (empty($fetched)) {
+                $detailFallback = parse_detail($listingUrl, ['read_url' => $listingUrl]);
+                if ($detailFallback) {
+                    $fetched[] = $detailFallback;
+                }
+            }
             foreach ($fetched as $b) {
                 $previewBooks[] = $b;
             }
@@ -792,6 +977,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Dedup, ambil detail setiap buku, lalu tampilkan hasil final.
         $seen = [];
+        $detailParsed = 0;
         foreach ($previewBooks as $preview) {
             $detailUrl = trim((string)($preview['detail_url'] ?? ''));
             if ($detailUrl === '' || isset($seen[$detailUrl])) {
@@ -803,9 +989,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (empty($preview['read_url'])) {
                 $preview['read_url'] = $detailUrl;
             }
-           
-            if (!empty($preview['title']) && !is_generic_page_title($preview['title'])) {
-                $results[] = $preview;
+
+            $book = $preview;
+            $needsDetail = empty($book['title']) || is_generic_page_title((string)$book['title']) || empty($book['cover_url']);
+            if ($needsDetail) {
+                $parsed = parse_detail($detailUrl, $book);
+                if ($parsed) {
+                    $book = $parsed;
+                    $detailParsed++;
+                }
+            }
+
+            if (!empty($book['title']) && !is_generic_page_title((string)$book['title'])) {
+                $results[] = $book;
 
             }
             if (count($results) >= $limit) {
@@ -821,6 +1017,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'detail_only_urls' => array_keys($detailOnly),
                     'preview_books_count' => count($previewBooks),
                     'unique_urls_count' => count($seen),
+                    'detail_parsed_count' => $detailParsed,
                     'results_count' => count($results),
                     'last_http_error' => http_get_last_error(),
                     'last_http_info' => http_get_last_info(),

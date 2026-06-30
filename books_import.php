@@ -40,7 +40,43 @@ function import_clean_isbn(string $value): string {
 
     $clean = strtoupper(preg_replace('/[^0-9X]/i', '', $value));
     $length = strlen($clean);
+    if (preg_match('/^(\d)\1+$/', $clean)) {
+        return '';
+    }
     return ($length === 10 || $length === 13) ? $clean : '';
+}
+
+function import_normalize_url(string $value): string {
+    $value = trim(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    if ($value === '') {
+        return '';
+    }
+    $value = preg_replace('/\s+/', '', $value);
+    $value = preg_replace('/#.*$/', '', $value);
+    $value = preg_replace('/^http:\/\//i', 'https://', $value);
+    return rtrim(strtolower($value), '/');
+}
+
+function import_source_url_from_description(string $description): string {
+    if (preg_match('#Imported from:\s*(https?://\S+)#i', $description, $m)) {
+        return import_normalize_url($m[1]);
+    }
+    return '';
+}
+
+function import_title_key(string $title, string $author, int $year, string $category): string {
+    $parts = [import_normalize_text($title)];
+    if (!import_author_is_placeholder($author)) {
+        $parts[] = import_normalize_text($author);
+    }
+    if ($year > 0) {
+        $parts[] = (string)$year;
+    }
+    $category = import_normalize_text($category);
+    if ($category !== '') {
+        $parts[] = $category;
+    }
+    return implode('|', $parts);
 }
 
 function import_author_is_placeholder(string $author): bool {
@@ -69,17 +105,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $inserted = 0;
             $skipped = 0;
             $failed = 0;
+            $skippedEmptyTitle = 0;
+            $skippedByUrl = 0;
+            $skippedByIsbn = 0;
+            $skippedByTitle = 0;
 
             // Ambil kunci buku yang sudah ada. ISBN placeholder seperti "-" diabaikan
             // agar tidak membuat semua data impor dianggap duplikat.
             $existingIsbns = [];
-            $existingTitleAuthors = [];
-            $existingTitles = [];
-            $existingRows = $pdo->query("SELECT isbn, title, author FROM books")->fetchAll(PDO::FETCH_ASSOC);
+            $existingUrls = [];
+            $existingTitleKeys = [];
+            $existingRows = $pdo->query("SELECT isbn, title, author, category, year, book_url, description FROM books")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($existingRows as $row) {
                 $existingTitle = import_normalize_text((string)($row['title'] ?? ''));
                 if ($existingTitle === '') {
                     continue;
+                }
+
+                $existingBookUrl = import_normalize_url((string)($row['book_url'] ?? ''));
+                if ($existingBookUrl !== '') {
+                    $existingUrls[$existingBookUrl] = true;
+                }
+                $existingSourceUrl = import_source_url_from_description((string)($row['description'] ?? ''));
+                if ($existingSourceUrl !== '') {
+                    $existingUrls[$existingSourceUrl] = true;
                 }
 
                 $existingIsbn = import_clean_isbn((string)($row['isbn'] ?? ''));
@@ -87,11 +136,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $existingIsbns[$existingIsbn] = true;
                 }
 
-                $existingAuthor = (string)($row['author'] ?? '');
-                $existingTitles[$existingTitle] = true;
-                if (!import_author_is_placeholder($existingAuthor)) {
-                    $existingTitleAuthors[$existingTitle . '|' . import_normalize_text($existingAuthor)] = true;
-                }
+                $existingTitleKeys[import_title_key(
+                    (string)($row['title'] ?? ''),
+                    (string)($row['author'] ?? ''),
+                    (int)($row['year'] ?? 0),
+                    (string)($row['category'] ?? '')
+                )] = true;
             }
 
             $stmt = $pdo->prepare(
@@ -100,12 +150,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                  VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)"
             );
 
-            $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM books WHERE code = ?");
-
             foreach ($books as $b) {
                 $title = trim((string)($b['title'] ?? ''));
                 if ($title === '') {
                     $skipped++;
+                    $skippedEmptyTitle++;
                     continue;
                 }
                 $author = trim((string)($b['author'] ?? ''));
@@ -115,23 +164,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 $book_url = trim((string)($b['book_url'] ?? ''));
                 $category = trim((string)($b['category'] ?? '')) ?: 'Ebook';
                 $description = trim((string)($b['description'] ?? ''));
+                $bookUrlKey = import_normalize_url($book_url);
+                $sourceUrlKey = import_source_url_from_description($description);
+                $titleKey = import_title_key($title, $author, $year, $category);
 
-                // Cek duplikat: ISBN valid diprioritaskan. Jika ISBN tidak valid/kosong,
-                // gunakan judul normalisasi; penulis dipakai hanya jika bukan placeholder.
+                // Cek duplikat: untuk data hasil ekspor lokal, URL buku/sumber adalah
+                // identitas paling kuat. ISBN dan judul dipakai sebagai fallback.
                 $exists = false;
-                if ($isbn !== '') {
-                    $exists = isset($existingIsbns[$isbn]);
-                }
-                if (!$exists) {
-                    $titleKey = import_normalize_text($title);
-                    if (!import_author_is_placeholder($author)) {
-                        $exists = isset($existingTitleAuthors[$titleKey . '|' . import_normalize_text($author)]);
-                    } else {
-                        $exists = isset($existingTitles[$titleKey]);
+                $skipReason = '';
+                if ($bookUrlKey !== '') {
+                    if (isset($existingUrls[$bookUrlKey])) {
+                        $exists = true;
+                        $skipReason = 'url';
                     }
+                }
+                if (!$exists && $sourceUrlKey !== '') {
+                    if (isset($existingUrls[$sourceUrlKey])) {
+                        $exists = true;
+                        $skipReason = 'url';
+                    }
+                }
+                if (!$exists && $isbn !== '' && isset($existingIsbns[$isbn])) {
+                    $exists = true;
+                    $skipReason = 'isbn';
+                }
+                if (!$exists && isset($existingTitleKeys[$titleKey])) {
+                    $exists = true;
+                    $skipReason = 'title';
                 }
                 if ($exists) {
                     $skipped++;
+                    if ($skipReason === 'url') {
+                        $skippedByUrl++;
+                    } elseif ($skipReason === 'isbn') {
+                        $skippedByIsbn++;
+                    } else {
+                        $skippedByTitle++;
+                    }
                     continue;
                 }
 
@@ -149,12 +218,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     if ($isbn !== '') {
                         $existingIsbns[$isbn] = true;
                     }
-                    $titleKey = import_normalize_text($title);
-                    $storedAuthor = $author !== '' ? $author : 'Tidak diketahui';
-                    $existingTitles[$titleKey] = true;
-                    if (!import_author_is_placeholder($storedAuthor)) {
-                        $existingTitleAuthors[$titleKey . '|' . import_normalize_text($storedAuthor)] = true;
+                    if ($bookUrlKey !== '') {
+                        $existingUrls[$bookUrlKey] = true;
                     }
+                    if ($sourceUrlKey !== '') {
+                        $existingUrls[$sourceUrlKey] = true;
+                    }
+                    $existingTitleKeys[$titleKey] = true;
                     $inserted++;
                 } catch (PDOException $e) {
                     $failed++;
@@ -166,13 +236,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 'inserted' => $inserted,
                 'skipped' => $skipped,
                 'failed' => $failed,
+                'skipped_empty_title' => $skippedEmptyTitle,
+                'skipped_by_url' => $skippedByUrl,
+                'skipped_by_isbn' => $skippedByIsbn,
+                'skipped_by_title' => $skippedByTitle,
             ];
 
             if ($inserted > 0) {
                 log_activity('create', activity_user_label() . ' mengimpor ' . $inserted . ' buku dari file ekspor');
             }
 
-            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (sudah ada), {$failed} gagal.";
+            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (URL: {$skippedByUrl}, ISBN: {$skippedByIsbn}, judul: {$skippedByTitle}, judul kosong: {$skippedEmptyTitle}), {$failed} gagal.";
             $messageType = $inserted > 0 ? 'success' : 'warning';
 
             $_SESSION['success'] = $message;
