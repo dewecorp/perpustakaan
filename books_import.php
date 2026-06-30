@@ -3,8 +3,8 @@
  * Impor data buku dari file JSON (hasil ekspor dari lokal).
  *
  * Dipakai di HOSTING: unggah file .json yang diekspor dari lokal, lalu sistem
- * memasukkan metadata buku tersebut. Duplikat dilewati (berdasarkan ISBN atau
- * judul+penulis).
+ * memasukkan metadata buku tersebut. Duplikat dilewati berdasarkan ISBN yang
+ * valid, lalu judul/penulis yang dinormalisasi.
  */
 require_once 'config/config.php';
 require_login();
@@ -19,6 +19,34 @@ $activePage = 'books';
 $message = '';
 $messageType = 'info';
 $importStats = null;
+
+function import_normalize_text(string $value): string {
+    $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $value = preg_replace('/\s+/u', ' ', trim($value));
+    return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+}
+
+function import_clean_isbn(string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $lower = str_replace([html_entity_decode('&#8212;', ENT_QUOTES, 'UTF-8'), html_entity_decode('&#8211;', ENT_QUOTES, 'UTF-8')], '-', import_normalize_text($value));
+    $placeholders = ['-', '--', '---', 'n/a', 'na', 'null', 'tidak ada', 'tidak tersedia', 'belum ada', 'tanpa isbn'];
+    if (in_array($lower, $placeholders, true)) {
+        return '';
+    }
+
+    $clean = strtoupper(preg_replace('/[^0-9X]/i', '', $value));
+    $length = strlen($clean);
+    return ($length === 10 || $length === 13) ? $clean : '';
+}
+
+function import_author_is_placeholder(string $author): bool {
+    $author = str_replace([html_entity_decode('&#8212;', ENT_QUOTES, 'UTF-8'), html_entity_decode('&#8211;', ENT_QUOTES, 'UTF-8')], '-', import_normalize_text($author));
+    return $author === '' || in_array($author, ['-', '--', 'tidak diketahui', 'unknown', 'anonim', 'n/a'], true);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'import_file') {
     @set_time_limit(300);
@@ -42,9 +70,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $skipped = 0;
             $failed = 0;
 
-            // Siapkan statement duplikat sekali.
-            $stDupIsbn = $pdo->prepare("SELECT COUNT(*) FROM books WHERE isbn <> '' AND isbn = ?");
-            $stDupTitle = $pdo->prepare("SELECT COUNT(*) FROM books WHERE title = ? AND author = ?");
+            // Ambil kunci buku yang sudah ada. ISBN placeholder seperti "-" diabaikan
+            // agar tidak membuat semua data impor dianggap duplikat.
+            $existingIsbns = [];
+            $existingTitleAuthors = [];
+            $existingTitles = [];
+            $existingRows = $pdo->query("SELECT isbn, title, author FROM books")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($existingRows as $row) {
+                $existingTitle = import_normalize_text((string)($row['title'] ?? ''));
+                if ($existingTitle === '') {
+                    continue;
+                }
+
+                $existingIsbn = import_clean_isbn((string)($row['isbn'] ?? ''));
+                if ($existingIsbn !== '') {
+                    $existingIsbns[$existingIsbn] = true;
+                }
+
+                $existingAuthor = (string)($row['author'] ?? '');
+                $existingTitles[$existingTitle] = true;
+                if (!import_author_is_placeholder($existingAuthor)) {
+                    $existingTitleAuthors[$existingTitle . '|' . import_normalize_text($existingAuthor)] = true;
+                }
+            }
 
             $stmt = $pdo->prepare(
                 "INSERT INTO books
@@ -61,22 +109,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     continue;
                 }
                 $author = trim((string)($b['author'] ?? ''));
-                $isbn = trim((string)($b['isbn'] ?? ''));
+                $isbn = import_clean_isbn((string)($b['isbn'] ?? ''));
                 $year = (int)($b['year'] ?? 0);
                 $cover_url = trim((string)($b['cover_url'] ?? ''));
                 $book_url = trim((string)($b['book_url'] ?? ''));
                 $category = trim((string)($b['category'] ?? '')) ?: 'Ebook';
                 $description = trim((string)($b['description'] ?? ''));
 
-                // Cek duplikat.
+                // Cek duplikat: ISBN valid diprioritaskan. Jika ISBN tidak valid/kosong,
+                // gunakan judul normalisasi; penulis dipakai hanya jika bukan placeholder.
                 $exists = false;
                 if ($isbn !== '') {
-                    $stDupIsbn->execute([$isbn]);
-                    if ((int)$stDupIsbn->fetchColumn() > 0) $exists = true;
+                    $exists = isset($existingIsbns[$isbn]);
                 }
                 if (!$exists) {
-                    $stDupTitle->execute([$title, $author]);
-                    if ((int)$stDupTitle->fetchColumn() > 0) $exists = true;
+                    $titleKey = import_normalize_text($title);
+                    if (!import_author_is_placeholder($author)) {
+                        $exists = isset($existingTitleAuthors[$titleKey . '|' . import_normalize_text($author)]);
+                    } else {
+                        $exists = isset($existingTitles[$titleKey]);
+                    }
                 }
                 if ($exists) {
                     $skipped++;
@@ -94,6 +146,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                         $year > 0 ? $year : 0,
                         $cover_url, $book_url, $description,
                     ]);
+                    if ($isbn !== '') {
+                        $existingIsbns[$isbn] = true;
+                    }
+                    $titleKey = import_normalize_text($title);
+                    $storedAuthor = $author !== '' ? $author : 'Tidak diketahui';
+                    $existingTitles[$titleKey] = true;
+                    if (!import_author_is_placeholder($storedAuthor)) {
+                        $existingTitleAuthors[$titleKey . '|' . import_normalize_text($storedAuthor)] = true;
+                    }
                     $inserted++;
                 } catch (PDOException $e) {
                     $failed++;
@@ -131,7 +192,7 @@ include __DIR__ . '/template/sidebar.php';
             <i class="bi bi-info-circle me-1"></i>
             <strong>Alur:</strong> Ekspor data buku di <b>lokal</b> (menu Data Buku &rarr; Ekspor) &rarr;
             unduh file <code>.json</code> &rarr; unggah file tersebut di sini (di <b>hosting</b>).
-            <br>Duplikat otomatis dilewati (berdasarkan ISBN atau judul+penulis). File PDF/sampul lokal tidak dipindahkan — hanya URL eksternal.
+            <br>Duplikat otomatis dilewati berdasarkan ISBN valid atau judul/penulis. File PDF/sampul lokal tidak dipindahkan — hanya URL eksternal.
         </div>
 
         <?php if ($message): ?>

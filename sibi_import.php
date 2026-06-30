@@ -10,6 +10,36 @@ $activePage = 'sibi_import';
 $lastHttpError = '';
 $lastHttpInfo = [];
 
+function sibi_import_normalize_text(string $value): string {
+    $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $value = preg_replace('/\s+/u', ' ', trim($value));
+    return function_exists('mb_strtolower') ? mb_strtolower($value, 'UTF-8') : strtolower($value);
+}
+
+function sibi_import_clean_isbn(string $value): string {
+    $value = trim($value);
+    if ($value === '') {
+        return '';
+    }
+
+    $dash = [html_entity_decode('&#8212;', ENT_QUOTES, 'UTF-8'), html_entity_decode('&#8211;', ENT_QUOTES, 'UTF-8')];
+    $lower = str_replace($dash, '-', sibi_import_normalize_text($value));
+    $placeholders = ['-', '--', '---', 'n/a', 'na', 'null', 'tidak ada', 'tidak tersedia', 'belum ada', 'tanpa isbn'];
+    if (in_array($lower, $placeholders, true)) {
+        return '';
+    }
+
+    $clean = strtoupper(preg_replace('/[^0-9X]/i', '', $value));
+    $length = strlen($clean);
+    return ($length === 10 || $length === 13) ? $clean : '';
+}
+
+function sibi_import_author_is_placeholder(string $author): bool {
+    $dash = [html_entity_decode('&#8212;', ENT_QUOTES, 'UTF-8'), html_entity_decode('&#8211;', ENT_QUOTES, 'UTF-8')];
+    $author = str_replace($dash, '-', sibi_import_normalize_text($author));
+    return $author === '' || in_array($author, ['-', '--', 'tidak diketahui', 'unknown', 'anonim', 'n/a'], true);
+}
+
 function http_get_last_error(): string {
     global $lastHttpError;
     return $lastHttpError;
@@ -818,29 +848,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payload = json_decode($_POST['payload'] ?? '[]', true);
         if (is_array($payload)) {
             $imported = 0;
+            $skipped = 0;
+            $failed = 0;
+
+            $existingIsbns = [];
+            $existingTitleAuthors = [];
+            $existingTitles = [];
+            $existingRows = $pdo->query("SELECT isbn, title, author FROM books")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($existingRows as $row) {
+                $existingTitle = sibi_import_normalize_text((string)($row['title'] ?? ''));
+                if ($existingTitle === '') {
+                    continue;
+                }
+
+                $existingIsbn = sibi_import_clean_isbn((string)($row['isbn'] ?? ''));
+                if ($existingIsbn !== '') {
+                    $existingIsbns[$existingIsbn] = true;
+                }
+
+                $existingAuthor = (string)($row['author'] ?? '');
+                $existingTitles[$existingTitle] = true;
+                if (!sibi_import_author_is_placeholder($existingAuthor)) {
+                    $existingTitleAuthors[$existingTitle . '|' . sibi_import_normalize_text($existingAuthor)] = true;
+                }
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO books (code, isbn, title, author, category, year, cover_url, cover_path, book_path, book_url, description) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)");
+
             foreach ($payload as $b) {
                 $title = trim($b['title'] ?? '');
-                if (!$title) continue;
+                if (!$title) {
+                    $skipped++;
+                    continue;
+                }
                 $author = trim($b['author'] ?? '');
-                $isbn = trim($b['isbn'] ?? '');
+                $isbn = sibi_import_clean_isbn((string)($b['isbn'] ?? ''));
                 $year = intval($b['year'] ?? 0);
                 $cover_url = trim($b['cover_url'] ?? '');
                 $book_url = trim($b['read_url'] ?? $b['download_url'] ?? $b['detail_url'] ?? '');
-                // Check duplicate by ISBN or title+author
+
+                // Cek duplikat: ISBN hanya dipakai jika valid. Jika ISBN kosong atau
+                // placeholder, gunakan judul normalisasi dan penulis bila tersedia.
                 $exists = false;
-                if ($isbn) {
-                    $st = $pdo->prepare("SELECT COUNT(*) FROM books WHERE isbn = ?");
-                    $st->execute([$isbn]);
-                    $exists = $st->fetchColumn() > 0;
+                if ($isbn !== '') {
+                    $exists = isset($existingIsbns[$isbn]);
                 }
                 if (!$exists) {
-                    $st = $pdo->prepare("SELECT COUNT(*) FROM books WHERE title = ? AND author = ?");
-                    $st->execute([$title, $author]);
-                    $exists = $st->fetchColumn() > 0;
+                    $titleKey = sibi_import_normalize_text($title);
+                    if (!sibi_import_author_is_placeholder($author)) {
+                        $exists = isset($existingTitleAuthors[$titleKey . '|' . sibi_import_normalize_text($author)]);
+                    } else {
+                        $exists = isset($existingTitles[$titleKey]);
+                    }
                 }
-                if ($exists) continue;
+                if ($exists) {
+                    $skipped++;
+                    continue;
+                }
                 $code = generate_next_book_code($pdo, $year, 'BI');
-                $stmt = $pdo->prepare("INSERT INTO books (code, isbn, title, author, category, year, cover_url, cover_path, book_path, book_url, description) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)");
                 try {
                     $category = 'Ebook';
                     if (!empty($b['jenjang']) && !empty($b['kurikulum'])) {
@@ -857,13 +922,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $book_url,
                         'Imported from: ' . ($b['detail_url'] ?? '')
                     ]);
+                    if ($isbn !== '') {
+                        $existingIsbns[$isbn] = true;
+                    }
+                    $titleKey = sibi_import_normalize_text($title);
+                    $storedAuthor = $author ?: 'Tidak diketahui';
+                    $existingTitles[$titleKey] = true;
+                    if (!sibi_import_author_is_placeholder($storedAuthor)) {
+                        $existingTitleAuthors[$titleKey . '|' . sibi_import_normalize_text($storedAuthor)] = true;
+                    }
                     $imported++;
                 } catch (PDOException $e) {
                     // Lewati buku yang gagal diinsert agar tidak menghentikan proses keseluruhan
+                    $failed++;
                     continue;
                 }
             }
-            $_SESSION['success'] = "Import selesai. Berhasil menambahkan {$imported} buku.";
+            $_SESSION['success'] = "Import selesai. Ditambahkan {$imported} buku, {$skipped} dilewati (sudah ada/kosong), {$failed} gagal.";
             header('Location: ' . BASE_URL . 'books.php');
             exit;
         }
@@ -995,7 +1070,7 @@ include __DIR__ . '/template/sidebar.php';
     </div>
     <div class="card-body">
         <?php if ($message): ?>
-            <div class="alert alert-warning"><?php echo htmlspecialchars($message); ?></div>
+            <div class="alert alert-warning"><?php echo strip_tags($message, '<br><small><b>'); ?></div>
         <?php endif; ?>
         <?php if (!empty($debugInfo)): ?>
             <div class="alert alert-secondary"><?php echo $debugInfo; ?></div>
