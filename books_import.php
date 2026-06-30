@@ -3,8 +3,8 @@
  * Impor data buku dari file JSON (hasil ekspor dari lokal).
  *
  * Dipakai di HOSTING: unggah file .json yang diekspor dari lokal, lalu sistem
- * memasukkan metadata buku tersebut. Duplikat dilewati berdasarkan ISBN yang
- * valid, lalu judul/penulis yang dinormalisasi.
+ * memasukkan metadata buku tersebut. Duplikat dilewati berdasarkan kode buku,
+ * URL buku/sumber yang unik, atau ISBN valid.
  */
 require_once 'config/config.php';
 require_login();
@@ -114,21 +114,6 @@ function import_source_url_from_description(string $description): string {
     return '';
 }
 
-function import_title_key(string $title, string $author, int $year, string $category): string {
-    $parts = [import_normalize_text($title)];
-    if (!import_author_is_placeholder($author)) {
-        $parts[] = import_normalize_text($author);
-    }
-    if ($year > 0) {
-        $parts[] = (string)$year;
-    }
-    $category = import_normalize_text($category);
-    if ($category !== '') {
-        $parts[] = $category;
-    }
-    return implode('|', $parts);
-}
-
 function import_code_key(string $code): string {
     return strtoupper(trim($code));
 }
@@ -163,7 +148,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $skippedByUrl = 0;
             $skippedByCode = 0;
             $skippedByIsbn = 0;
-            $skippedByTitle = 0;
             $importUrlCounts = [];
 
             foreach ($books as $b) {
@@ -184,7 +168,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $existingCodes = [];
             $existingIsbns = [];
             $existingUrls = [];
-            $existingTitleKeys = [];
             $existingRows = $pdo->query("SELECT code, isbn, title, author, category, year, book_url, description FROM books")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($existingRows as $row) {
                 $existingTitle = import_normalize_text((string)($row['title'] ?? ''));
@@ -213,13 +196,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 if ($existingIsbn !== '') {
                     $existingIsbns[$existingIsbn] = true;
                 }
-
-                $existingTitleKeys[import_title_key(
-                    (string)($row['title'] ?? ''),
-                    (string)($row['author'] ?? ''),
-                    (int)($row['year'] ?? 0),
-                    (string)($row['category'] ?? '')
-                )] = true;
             }
 
             $stmt = $pdo->prepare(
@@ -248,10 +224,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $bookUrlKey = '';
                 }
                 $sourceUrlKey = import_source_url_from_description($description);
-                $titleKey = import_title_key($title, $author, $year, $category);
 
                 // Cek duplikat: untuk data hasil ekspor lokal, URL buku/sumber adalah
-                // identitas paling kuat. ISBN dan judul dipakai sebagai fallback.
+                // identitas paling kuat. Judul tidak dipakai untuk menahan impor karena
+                // banyak koleksi punya judul sama tetapi edisi/kategori berbeda.
                 $exists = false;
                 $skipReason = '';
                 if ($sourceCode !== '' && isset($existingCodes[$sourceCode])) {
@@ -274,20 +250,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $exists = true;
                     $skipReason = 'isbn';
                 }
-                if (!$exists && isset($existingTitleKeys[$titleKey])) {
-                    $exists = true;
-                    $skipReason = 'title';
-                }
                 if ($exists) {
                     $skipped++;
                     if ($skipReason === 'code') {
                         $skippedByCode++;
                     } elseif ($skipReason === 'url') {
                         $skippedByUrl++;
-                    } elseif ($skipReason === 'isbn') {
-                        $skippedByIsbn++;
                     } else {
-                        $skippedByTitle++;
+                        $skippedByIsbn++;
                     }
                     continue;
                 }
@@ -315,7 +285,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     if ($sourceCode !== '') {
                         $existingCodes[$sourceCode] = true;
                     }
-                    $existingTitleKeys[$titleKey] = true;
                     $inserted++;
                 } catch (PDOException $e) {
                     $failed++;
@@ -331,14 +300,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 'skipped_by_code' => $skippedByCode,
                 'skipped_by_url' => $skippedByUrl,
                 'skipped_by_isbn' => $skippedByIsbn,
-                'skipped_by_title' => $skippedByTitle,
             ];
 
             if ($inserted > 0) {
                 log_activity('create', activity_user_label() . ' mengimpor ' . $inserted . ' buku dari file ekspor');
             }
 
-            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (kode: {$skippedByCode}, URL: {$skippedByUrl}, ISBN: {$skippedByIsbn}, judul: {$skippedByTitle}, judul kosong: {$skippedEmptyTitle}), {$failed} gagal.";
+            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (kode: {$skippedByCode}, URL: {$skippedByUrl}, ISBN: {$skippedByIsbn}, judul kosong: {$skippedEmptyTitle}), {$failed} gagal.";
             $messageType = $inserted > 0 ? 'success' : 'warning';
 
             $_SESSION['success'] = $message;
@@ -358,7 +326,7 @@ include __DIR__ . '/template/sidebar.php';
             <i class="bi bi-info-circle me-1"></i>
             <strong>Alur:</strong> Ekspor data buku di <b>lokal</b> (menu Data Buku &rarr; Ekspor) &rarr;
             unduh file <code>.json</code> &rarr; unggah file tersebut di sini (di <b>hosting</b>).
-            <br>Duplikat otomatis dilewati berdasarkan ISBN valid atau judul/penulis. File PDF/sampul lokal tidak dipindahkan — hanya URL eksternal.
+            <br>Duplikat otomatis dilewati berdasarkan kode buku, URL unik, atau ISBN valid. File PDF/sampul lokal tidak dipindahkan — hanya URL eksternal.
         </div>
 
         <?php if ($message): ?>
