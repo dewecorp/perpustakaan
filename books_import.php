@@ -159,6 +159,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $skippedByUrl = 0;
             $skippedByIsbn = 0;
             $skippedByTitle = 0;
+            $importUrlCounts = [];
+
+            foreach ($books as $b) {
+                $candidateUrls = [
+                    import_normalize_url((string)($b['book_url'] ?? '')),
+                    import_source_url_from_description((string)($b['description'] ?? '')),
+                ];
+                foreach ($candidateUrls as $candidateUrl) {
+                    if ($candidateUrl === '' || !import_url_is_specific_book($candidateUrl)) {
+                        continue;
+                    }
+                    $importUrlCounts[$candidateUrl] = ($importUrlCounts[$candidateUrl] ?? 0) + 1;
+                }
+            }
 
             // Ambil kunci buku yang sudah ada. ISBN placeholder seperti "-" diabaikan
             // agar tidak membuat semua data impor dianggap duplikat.
@@ -189,12 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $existingIsbns[$existingIsbn] = true;
                 }
 
-                $existingTitleKeys[import_title_key(
-                    (string)($row['title'] ?? ''),
-                    (string)($row['author'] ?? ''),
-                    (int)($row['year'] ?? 0),
-                    (string)($row['category'] ?? '')
-                )] = true;
+                $existingTitleKeys[$existingTitle] = true;
             }
 
             $stmt = $pdo->prepare(
@@ -222,19 +231,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $bookUrlKey = '';
                 }
                 $sourceUrlKey = import_source_url_from_description($description);
-                $titleKey = import_title_key($title, $author, $year, $category);
+                $titleKey = import_normalize_text($title);
 
                 // Cek duplikat: untuk data hasil ekspor lokal, URL buku/sumber adalah
                 // identitas paling kuat. ISBN dan judul dipakai sebagai fallback.
                 $exists = false;
                 $skipReason = '';
-                if ($bookUrlKey !== '') {
+                if ($bookUrlKey !== '' && ($importUrlCounts[$bookUrlKey] ?? 0) === 1) {
                     if (isset($existingUrls[$bookUrlKey])) {
                         $exists = true;
                         $skipReason = 'url';
                     }
                 }
-                if (!$exists && $sourceUrlKey !== '') {
+                if (!$exists && $sourceUrlKey !== '' && ($importUrlCounts[$sourceUrlKey] ?? 0) === 1) {
                     if (isset($existingUrls[$sourceUrlKey])) {
                         $exists = true;
                         $skipReason = 'url';
