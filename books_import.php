@@ -57,9 +57,59 @@ function import_normalize_url(string $value): string {
     return rtrim(strtolower($value), '/');
 }
 
+function import_url_is_specific_book(string $url): bool {
+    $url = import_normalize_url($url);
+    if ($url === '') {
+        return false;
+    }
+
+    $path = strtolower((string)(parse_url($url, PHP_URL_PATH) ?? ''));
+    $query = strtolower((string)(parse_url($url, PHP_URL_QUERY) ?? ''));
+    if ($path === '' || $path === '/') {
+        return false;
+    }
+
+    // URL daftar/kategori/pencarian sering sama untuk banyak buku. Jangan jadikan
+    // kunci duplikat, karena bisa membuat semua hasil ekspor dilewati.
+    $listingPatterns = [
+        '#/(kategori|category|categories|tag|tags|search|cari|pencarian)(/|$)#i',
+        '#/(katalog|catalog|catalogue|koleksi|collections?|perpustakaan|ebook|buku|modul)/?$#i',
+        '#/konten/list/detail/#i',
+    ];
+    foreach ($listingPatterns as $pattern) {
+        if (preg_match($pattern, $path)) {
+            return false;
+        }
+    }
+    if ($query !== '' && preg_match('#\b(q|query|keyword|search|cari|kategori|category|page)=#i', $query)) {
+        return false;
+    }
+
+    $detailPatterns = [
+        '#\.pdf$#i',
+        '#/(publik/)?buku_detail/[^/]+#i',
+        '#/(detail|detail-buku|book/detail|books/detail|buku/.+/detail|koleksi/.+/detail)/#i',
+        '#/(download|viewer|reader|read|baca)/[^/]+#i',
+    ];
+    foreach ($detailPatterns as $pattern) {
+        if (preg_match($pattern, $path)) {
+            return true;
+        }
+    }
+
+    $segments = array_values(array_filter(explode('/', trim($path, '/'))));
+    if (count($segments) < 2) {
+        return false;
+    }
+
+    $last = end($segments);
+    return is_string($last) && preg_match('#[a-z0-9]#i', $last) && strlen($last) >= 4;
+}
+
 function import_source_url_from_description(string $description): string {
     if (preg_match('#Imported from:\s*(https?://\S+)#i', $description, $m)) {
-        return import_normalize_url($m[1]);
+        $url = import_normalize_url($m[1]);
+        return import_url_is_specific_book($url) ? $url : '';
     }
     return '';
 }
@@ -123,6 +173,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 }
 
                 $existingBookUrl = import_normalize_url((string)($row['book_url'] ?? ''));
+                if (!import_url_is_specific_book($existingBookUrl)) {
+                    $existingBookUrl = '';
+                }
                 if ($existingBookUrl !== '') {
                     $existingUrls[$existingBookUrl] = true;
                 }
@@ -165,6 +218,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 $category = trim((string)($b['category'] ?? '')) ?: 'Ebook';
                 $description = trim((string)($b['description'] ?? ''));
                 $bookUrlKey = import_normalize_url($book_url);
+                if (!import_url_is_specific_book($bookUrlKey)) {
+                    $bookUrlKey = '';
+                }
                 $sourceUrlKey = import_source_url_from_description($description);
                 $titleKey = import_title_key($title, $author, $year, $category);
 
