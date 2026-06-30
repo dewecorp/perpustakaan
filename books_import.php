@@ -129,6 +129,10 @@ function import_title_key(string $title, string $author, int $year, string $cate
     return implode('|', $parts);
 }
 
+function import_code_key(string $code): string {
+    return strtoupper(trim($code));
+}
+
 function import_author_is_placeholder(string $author): bool {
     $author = str_replace([html_entity_decode('&#8212;', ENT_QUOTES, 'UTF-8'), html_entity_decode('&#8211;', ENT_QUOTES, 'UTF-8')], '-', import_normalize_text($author));
     return $author === '' || in_array($author, ['-', '--', 'tidak diketahui', 'unknown', 'anonim', 'n/a'], true);
@@ -157,6 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
             $failed = 0;
             $skippedEmptyTitle = 0;
             $skippedByUrl = 0;
+            $skippedByCode = 0;
             $skippedByIsbn = 0;
             $skippedByTitle = 0;
             $importUrlCounts = [];
@@ -176,14 +181,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
 
             // Ambil kunci buku yang sudah ada. ISBN placeholder seperti "-" diabaikan
             // agar tidak membuat semua data impor dianggap duplikat.
+            $existingCodes = [];
             $existingIsbns = [];
             $existingUrls = [];
             $existingTitleKeys = [];
-            $existingRows = $pdo->query("SELECT isbn, title, author, category, year, book_url, description FROM books")->fetchAll(PDO::FETCH_ASSOC);
+            $existingRows = $pdo->query("SELECT code, isbn, title, author, category, year, book_url, description FROM books")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($existingRows as $row) {
                 $existingTitle = import_normalize_text((string)($row['title'] ?? ''));
                 if ($existingTitle === '') {
                     continue;
+                }
+
+                $existingCode = import_code_key((string)($row['code'] ?? ''));
+                if ($existingCode !== '') {
+                    $existingCodes[$existingCode] = true;
                 }
 
                 $existingBookUrl = import_normalize_url((string)($row['book_url'] ?? ''));
@@ -203,7 +214,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $existingIsbns[$existingIsbn] = true;
                 }
 
-                $existingTitleKeys[$existingTitle] = true;
+                $existingTitleKeys[import_title_key(
+                    (string)($row['title'] ?? ''),
+                    (string)($row['author'] ?? ''),
+                    (int)($row['year'] ?? 0),
+                    (string)($row['category'] ?? '')
+                )] = true;
             }
 
             $stmt = $pdo->prepare(
@@ -219,6 +235,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $skippedEmptyTitle++;
                     continue;
                 }
+                $sourceCode = import_code_key((string)($b['code'] ?? ''));
                 $author = trim((string)($b['author'] ?? ''));
                 $isbn = import_clean_isbn((string)($b['isbn'] ?? ''));
                 $year = (int)($b['year'] ?? 0);
@@ -231,12 +248,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     $bookUrlKey = '';
                 }
                 $sourceUrlKey = import_source_url_from_description($description);
-                $titleKey = import_normalize_text($title);
+                $titleKey = import_title_key($title, $author, $year, $category);
 
                 // Cek duplikat: untuk data hasil ekspor lokal, URL buku/sumber adalah
                 // identitas paling kuat. ISBN dan judul dipakai sebagai fallback.
                 $exists = false;
                 $skipReason = '';
+                if ($sourceCode !== '' && isset($existingCodes[$sourceCode])) {
+                    $exists = true;
+                    $skipReason = 'code';
+                }
                 if ($bookUrlKey !== '' && ($importUrlCounts[$bookUrlKey] ?? 0) === 1) {
                     if (isset($existingUrls[$bookUrlKey])) {
                         $exists = true;
@@ -259,7 +280,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 }
                 if ($exists) {
                     $skipped++;
-                    if ($skipReason === 'url') {
+                    if ($skipReason === 'code') {
+                        $skippedByCode++;
+                    } elseif ($skipReason === 'url') {
                         $skippedByUrl++;
                     } elseif ($skipReason === 'isbn') {
                         $skippedByIsbn++;
@@ -289,6 +312,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                     if ($sourceUrlKey !== '') {
                         $existingUrls[$sourceUrlKey] = true;
                     }
+                    if ($sourceCode !== '') {
+                        $existingCodes[$sourceCode] = true;
+                    }
                     $existingTitleKeys[$titleKey] = true;
                     $inserted++;
                 } catch (PDOException $e) {
@@ -302,6 +328,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 'skipped' => $skipped,
                 'failed' => $failed,
                 'skipped_empty_title' => $skippedEmptyTitle,
+                'skipped_by_code' => $skippedByCode,
                 'skipped_by_url' => $skippedByUrl,
                 'skipped_by_isbn' => $skippedByIsbn,
                 'skipped_by_title' => $skippedByTitle,
@@ -311,7 +338,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'impor
                 log_activity('create', activity_user_label() . ' mengimpor ' . $inserted . ' buku dari file ekspor');
             }
 
-            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (URL: {$skippedByUrl}, ISBN: {$skippedByIsbn}, judul: {$skippedByTitle}, judul kosong: {$skippedEmptyTitle}), {$failed} gagal.";
+            $message = "Impor selesai. Ditambahkan {$inserted} buku, {$skipped} dilewati (kode: {$skippedByCode}, URL: {$skippedByUrl}, ISBN: {$skippedByIsbn}, judul: {$skippedByTitle}, judul kosong: {$skippedEmptyTitle}), {$failed} gagal.";
             $messageType = $inserted > 0 ? 'success' : 'warning';
 
             $_SESSION['success'] = $message;
