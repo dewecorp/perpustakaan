@@ -32,7 +32,6 @@ $skipFiles = [
     'config/database.local.php',
     'config/database.production.php',
     'config/database.php',
-    '.htaccess',
 ];
 
 $skipDirs = [
@@ -123,17 +122,27 @@ function update_copy_tree(string $source, string $dest, array $skipFiles, array 
             throw new RuntimeException('Gagal membuat folder tujuan: ' . $targetDir);
         }
         if (!@copy($item->getPathname(), $target)) {
-            if (is_file($target) && !is_writable($target)) {
+            if (is_file($target)) {
                 @chmod($target, 0644);
+                @unlink($target);
             }
             if (!@copy($item->getPathname(), $target)) {
                 $srcContent = @file_get_contents($item->getPathname());
-                if ($srcContent !== false && @file_put_contents($target, $srcContent) !== false) {
-                    $copied++;
-                    continue;
+                if ($srcContent !== false) {
+                    if (@file_put_contents($target, $srcContent) !== false) {
+                        $copied++;
+                        continue;
+                    }
+                    $tmpf = @tempnam(dirname($target), '.up_');
+                    if ($tmpf !== false && @file_put_contents($tmpf, $srcContent) !== false) {
+                        if (@rename($tmpf, $target)) {
+                            $copied++;
+                            continue;
+                        }
+                        @unlink($tmpf);
+                    }
                 }
-                $msg = 'Gagal menyalin file: ' . $relative;
-                error_log('[PUSDIGI Update] ' . $msg);
+                error_log('[PUSDIGI Update] Gagal menyalin file: ' . $relative);
                 continue;
             }
         }
