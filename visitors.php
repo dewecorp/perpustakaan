@@ -5,6 +5,14 @@ $pdo = db();
 
 clean_old_visitors();
 
+function visitor_avatar_html(string $name, int $size = 36): string {
+    $s = min(max($size, 24), 80);
+    if (strpos($name, 'Tamu') === 0) {
+        return '<span class="d-inline-flex align-items-center justify-content-center rounded-circle text-white" style="width:' . $s . 'px;height:' . $s . 'px;background:#6c757d;font-size:' . round($s * 0.55) . 'px;"><i class="bi bi-person-fill"></i></span>';
+    }
+    return '<img src="https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random&color=fff&size=' . $s . '" class="rounded-circle" width="' . $s . '" height="' . $s . '" alt="">';
+}
+
 function visitor_purpose_meta(string $purpose): array {
     if (preg_match('/^Melihat Buku:\s*(.+)$/iu', $purpose, $m)) {
         return [
@@ -421,7 +429,7 @@ include 'template/sidebar.php';
                         ?>
                         <div class="tl-item">
                             <div class="tl-avatar">
-                                <img src="https://ui-avatars.com/api/?name=<?php echo urlencode($row['name']); ?>&background=random&color=fff&size=40" alt="">
+                                <?php echo visitor_avatar_html($row['name'], 40); ?>
                             </div>
                             <div class="tl-body">
                                 <div class="tl-name"><?php echo htmlspecialchars($row['name']); ?></div>
@@ -562,8 +570,7 @@ include 'template/sidebar.php';
                         <td class="text-muted text-center small"><?php echo $idx++; ?></td>
                         <td data-order="<?php echo htmlspecialchars($row['name']); ?>">
                             <div class="d-flex align-items-center gap-2">
-                                <img src="https://ui-avatars.com/api/?name=<?php echo urlencode($row['name']); ?>&background=random&color=fff&size=36"
-                                     class="rounded-circle" width="36" height="36" alt="">
+                                <?php echo visitor_avatar_html($row['name'], 36); ?>
                                 <div>
                                     <div class="fw-semibold small"><?php echo htmlspecialchars($row['name']); ?></div>
                                     <small class="text-muted"><?php echo time_ago($row['visit_date']); ?></small>
