@@ -103,6 +103,15 @@ $topBooks = $pdo->query("
 $visitors = $pdo->query("SELECT * FROM visitors ORDER BY visit_date DESC")->fetchAll();
 $totalVisitors = count($visitors);
 
+$countryStats = $pdo->query("
+    SELECT COALESCE(NULLIF(country, ''), 'Tidak diketahui') as country, COUNT(*) as total
+    FROM visitors
+    GROUP BY country
+    ORDER BY total DESC
+    LIMIT 10
+")->fetchAll();
+$countryMax = !empty($countryStats) ? max(array_column($countryStats, 'total')) : 1;
+
 $viewPct = $stats['total'] > 0 ? round(($stats['views'] / $stats['total']) * 100) : 0;
 $dlPct = $stats['total'] > 0 ? round(($stats['downloads'] / $stats['total']) * 100) : 0;
 
@@ -533,6 +542,35 @@ include 'template/sidebar.php';
                     <span class="text-muted">Pengunjung Unik</span>
                     <span class="fw-bold"><?php echo $stats['unique']; ?></span>
                 </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="bi bi-globe me-1"></i> Negara Pengunjung</h3>
+            </div>
+            <div class="card-body p-0">
+                <?php if (empty($countryStats) || (count($countryStats) === 1 && $countryStats[0]['country'] === 'Tidak diketahui')): ?>
+                    <p class="text-center text-muted p-4 mb-0 small">Data negara belum tersedia.</p>
+                <?php else: ?>
+                    <ul class="list-group list-group-flush">
+                        <?php foreach ($countryStats as $c):
+                            $cPct = round(($c['total'] / $countryMax) * 100);
+                            $flag = strtolower(substr($c['country'], 0, 2));
+                        ?>
+                        <li class="list-group-item d-flex align-items-center gap-2 py-2">
+                            <span class="text-muted small flex-shrink-0" style="width:20px;"><?php echo $c['country'] === 'Lokal' ? '<i class="bi bi-house-door"></i>' : '<i class="bi bi-globe2"></i>'; ?></span>
+                            <span class="small flex-shrink-0" style="width:100px;"><?php echo htmlspecialchars($c['country']); ?></span>
+                            <div class="flex-grow-1">
+                                <div class="progress" style="height:6px;">
+                                    <div class="progress-bar bg-secondary" style="width:<?php echo $cPct; ?>%;"></div>
+                                </div>
+                            </div>
+                            <span class="small fw-semibold flex-shrink-0" style="width:40px;text-align:right;"><?php echo (int)$c['total']; ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
             </div>
         </div>
     </div>

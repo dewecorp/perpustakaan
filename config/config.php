@@ -230,6 +230,45 @@ function visitor_display_name(): string {
     return 'Tamu (' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . ')';
 }
 
+function visitor_ip(): string {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+    if ($forwarded !== '') {
+        $ips = explode(',', $forwarded);
+        $ip = trim($ips[0]);
+    }
+    return $ip;
+}
+
+function visitor_country(string $ip): string {
+    if ($ip === '0.0.0.0' || $ip === '::1' || strpos($ip, '127.') === 0 || strpos($ip, '192.168.') === 0 || strpos($ip, '10.') === 0) {
+        return 'Lokal';
+    }
+
+    $cacheFile = __DIR__ . '/../data/geo_cache.json';
+    $cache = [];
+    if (is_file($cacheFile)) {
+        $cache = json_decode(file_get_contents($cacheFile), true) ?? [];
+    }
+
+    if (isset($cache[$ip]) && time() - $cache[$ip]['time'] < 86400) {
+        return $cache[$ip]['country'];
+    }
+
+    $country = 'Tidak diketahui';
+    $body = @file_get_contents("http://ip-api.com/json/{$ip}?fields=status,country");
+    if ($body !== false) {
+        $data = json_decode($body, true);
+        if (!empty($data['status']) && $data['status'] === 'success' && !empty($data['country'])) {
+            $country = $data['country'];
+        }
+    }
+
+    $cache[$ip] = ['country' => $country, 'time' => time()];
+    @file_put_contents($cacheFile, json_encode($cache, JSON_UNESCAPED_UNICODE));
+    return $country;
+}
+
 /**
  * Catat kunjungan lihat/unduh buku ke tabel visitors.
  */
@@ -242,10 +281,12 @@ function log_book_visit(array $book, string $action = 'view'): void {
 
     $title = (string)($book['title'] ?? 'Buku');
     $purpose = $action === 'download' ? "Mengunduh Buku: $title" : "Melihat Buku: $title";
+    $ip = visitor_ip();
+    $country = visitor_country($ip);
 
     try {
-        $stmt = $pdo->prepare("INSERT INTO visitors (name, purpose, book_id) VALUES (?, ?, ?)");
-        $stmt->execute([visitor_display_name(), $purpose, $bookId]);
+        $stmt = $pdo->prepare("INSERT INTO visitors (name, purpose, book_id, ip_address, country) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([visitor_display_name(), $purpose, $bookId, $ip, $country]);
 
         $column = $action === 'download' ? 'downloads' : 'views';
         $pdo->prepare("UPDATE books SET {$column} = {$column} + 1 WHERE id = ?")->execute([$bookId]);

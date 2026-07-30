@@ -135,6 +135,7 @@ function update_copy_tree(string $source, string $dest, array $skipFiles, array 
                     }
                     $tmpf = @tempnam(dirname($target), '.up_');
                     if ($tmpf !== false && @file_put_contents($tmpf, $srcContent) !== false) {
+                        @chmod($tmpf, 0644);
                         if (@rename($tmpf, $target)) {
                             $copied++;
                             continue;
