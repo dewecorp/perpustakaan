@@ -5,6 +5,15 @@ $pdo = db();
 
 clean_old_visitors();
 
+$vcols = $pdo->query("DESCRIBE visitors")->fetchAll(PDO::FETCH_COLUMN);
+if (!in_array('ip_address', $vcols)) {
+    $pdo->exec("ALTER TABLE visitors ADD COLUMN ip_address VARCHAR(45) DEFAULT NULL AFTER book_id");
+}
+if (!in_array('country', $vcols)) {
+    $pdo->exec("ALTER TABLE visitors ADD COLUMN country VARCHAR(100) DEFAULT NULL AFTER ip_address");
+    $pdo->exec("ALTER TABLE visitors ADD INDEX idx_visitors_country (country)");
+}
+
 function visitor_avatar_html(string $name, int $size = 36): string {
     $s = min(max($size, 24), 80);
     if (strpos($name, 'Tamu') === 0) {
