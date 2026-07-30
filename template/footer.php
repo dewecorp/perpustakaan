@@ -93,12 +93,28 @@ $(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif', function(e) {
             }
         });
 
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 300000);
+
         fetch('<?php echo BASE_URL; ?>update_system.php', {
             method: 'POST',
             credentials: 'same-origin',
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            signal: controller.signal
         })
-        .then(function(response) { return response.json(); })
+        .then(function(response) {
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                return response.text().then(function(text) {
+                    throw new Error('HTTP ' + response.status + ': ' + text.substring(0, 300));
+                });
+            }
+            return response.json().catch(function() {
+                return response.text().then(function(text) {
+                    throw new Error('Response bukan JSON: ' + text.substring(0, 300));
+                });
+            });
+        })
         .then(function(data) {
             var elapsed = Date.now() - startTime;
             var wait = Math.max(0, 4500 - elapsed);
@@ -115,12 +131,16 @@ $(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif', function(e) {
                 });
             }, wait);
         })
-        .catch(function() {
+        .catch(function(err) {
             clearInterval(stepTimer);
+            var msg = 'Tidak dapat menghubungi server update.';
+            if (err && err.message) {
+                msg = err.name === 'AbortError' ? 'Waktu tunggu habis. Server terlalu lama merespon.' : err.message;
+            }
             Swal.fire({
                 icon: 'error',
                 title: 'Update Gagal',
-                text: 'Tidak dapat menghubungi server update.'
+                text: msg
             });
         });
     });

@@ -1,9 +1,19 @@
 <?php
 require_once __DIR__ . '/config/config.php';
-require_login();
-require_admin();
 
 header('Content-Type: application/json; charset=utf-8');
+
+if (empty($_SESSION['user'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'message' => 'Sesi habis. Silakan login ulang.']);
+    exit;
+}
+enforce_session_idle_lock();
+if (current_user_role() !== 'admin') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Akses ditolak.']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
