@@ -122,8 +122,20 @@ function update_copy_tree(string $source, string $dest, array $skipFiles, array 
         if (!is_dir($targetDir) && !mkdir($targetDir, 0755, true) && !is_dir($targetDir)) {
             throw new RuntimeException('Gagal membuat folder tujuan: ' . $targetDir);
         }
-        if (!copy($item->getPathname(), $target)) {
-            throw new RuntimeException('Gagal menyalin file: ' . $relative);
+        if (!@copy($item->getPathname(), $target)) {
+            if (is_file($target) && !is_writable($target)) {
+                @chmod($target, 0644);
+            }
+            if (!@copy($item->getPathname(), $target)) {
+                $srcContent = @file_get_contents($item->getPathname());
+                if ($srcContent !== false && @file_put_contents($target, $srcContent) !== false) {
+                    $copied++;
+                    continue;
+                }
+                $msg = 'Gagal menyalin file: ' . $relative;
+                error_log('[PUSDIGI Update] ' . $msg);
+                continue;
+            }
         }
         $copied++;
     }
