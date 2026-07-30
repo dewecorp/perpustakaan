@@ -32,6 +32,7 @@ $skipFiles = [
     'config/database.local.php',
     'config/database.production.php',
     'config/database.php',
+    '.htaccess',
 ];
 
 $skipDirs = [
