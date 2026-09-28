@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
     if ($.fn.DataTable) {
+        $.fn.dataTable.ext.errMode = 'none';
         $('.table:not(.custom-table):not(.no-datatable)').each(function () {
             if (!$.fn.DataTable.isDataTable(this)) {
                 var isCompact = $(this).hasClass('table-compact');
@@ -173,14 +174,35 @@ $(document).on('submit', '.delete-book-form', function(e) {
         if (result.isConfirmed) form.submit();
     });
 });
+$(document).ready(function() {
 <?php if (isset($_SESSION['success'])): ?>
-Swal.fire({ icon: 'success', title: 'Sukses!', text: <?php echo json_encode($_SESSION['success']); ?>, timer: 2000, showConfirmButton: false });
+    Swal.fire({
+        icon: 'success',
+        title: 'Sukses!',
+        text: <?php echo json_encode($_SESSION['success']); ?>,
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: true,
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#198754',
+        allowOutsideClick: true,
+        allowEscapeKey: true
+    });
 <?php unset($_SESSION['success']); endif; ?>
 <?php if (isset($_SESSION['error'])): ?>
-Swal.fire({ icon: 'error', title: 'Gagal!', text: <?php echo json_encode($_SESSION['error']); ?> });
+    Swal.fire({
+        icon: 'error',
+        title: 'Gagal!',
+        text: <?php echo json_encode($_SESSION['error']); ?>,
+        allowOutsideClick: true,
+        allowEscapeKey: true
+    });
 <?php unset($_SESSION['error']); endif; ?>
+});
 <?php if (
-    !empty($githubUpdate['has_update'])
+    empty($_SESSION['success'])
+    && empty($_SESSION['error'])
+    && !empty($githubUpdate['has_update'])
     && current_user_role() === 'admin'
     && github_should_show_update_popup($githubUpdate ?? [])
 ): ?>

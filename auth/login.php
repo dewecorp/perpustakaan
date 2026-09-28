@@ -102,7 +102,10 @@ Swal.fire({
     title: 'Sukses!',
     text: <?php echo json_encode($successMessage); ?>,
     timer: 2000,
-    showConfirmButton: false
+    timerProgressBar: true,
+    showConfirmButton: true,
+    confirmButtonText: 'OK',
+    confirmButtonColor: '#198754'
 }).then(function() {
     window.location.href = <?php echo json_encode(BASE_URL . 'dashboard.php'); ?>;
 });

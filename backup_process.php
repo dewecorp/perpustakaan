@@ -49,6 +49,7 @@ if ($action === 'backup') {
 
         // Return JSON if AJAX
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+            $_SESSION['success'] = "Backup berhasil dibuat";
             echo json_encode(['status' => 'success', 'message' => 'Backup berhasil dibuat']);
             exit;
         }

@@ -142,6 +142,36 @@ if (isset($_SESSION['user']) && current_user_role() === 'admin') {
             0%, 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.35); }
             50% { box-shadow: 0 0 0 6px rgba(13, 110, 253, 0); }
         }
+        /* Smooth UI Animations & Hover Effects */
+        .card {
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+        .card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.08) !important;
+        }
+        .btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        }
+        .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+        }
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+        .form-control, .form-select {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+        .app-sidebar .sidebar-menu .nav-link {
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        }
+        .app-sidebar .sidebar-menu .nav-link:hover {
+            transform: translateX(3px);
+        }
     </style>
 </head>
 <body class="layout-fixed fixed-header sidebar-expand-lg bg-body-tertiary">
