@@ -151,7 +151,7 @@ include 'template/sidebar.php';
             <div class="card-header">
                 <h3 class="card-title">Aktivitas Pengguna (Total: <?php echo $totalActivities; ?>)</h3>
             </div>
-            <div class="card-body p-3" style="max-height:460px; overflow-y:auto;">
+            <div class="card-body p-3 activity-scroll-container" style="max-height:460px; overflow-y:auto; scroll-behavior:smooth;">
                 <?php if (empty($activities)): ?>
                     <p class="text-center text-muted p-4">Belum ada aktivitas.</p>
                 <?php else: ?>

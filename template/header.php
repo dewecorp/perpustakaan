@@ -172,6 +172,24 @@ if (isset($_SESSION['user']) && current_user_role() === 'admin') {
         .app-sidebar .sidebar-menu .nav-link:hover {
             transform: translateX(3px);
         }
+        .activity-scroll-container {
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        .activity-scroll-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .activity-scroll-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.03);
+            border-radius: 4px;
+        }
+        .activity-scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 4px;
+        }
+        .activity-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.35);
+        }
     </style>
 </head>
 <body class="layout-fixed fixed-header sidebar-expand-lg bg-body-tertiary">

@@ -30,6 +30,12 @@ document.addEventListener('DOMContentLoaded', function () {
             scrollbars: { theme: 'os-theme-light', autoHide: 'leave', clickScroll: true }
         });
     }
+    const activityContainer = document.querySelector('.activity-scroll-container');
+    if (activityContainer && typeof OverlayScrollbarsGlobal !== 'undefined' && OverlayScrollbarsGlobal?.OverlayScrollbars && !isMobile) {
+        OverlayScrollbarsGlobal.OverlayScrollbars(activityContainer, {
+            scrollbars: { theme: 'os-theme-dark', autoHide: 'leave', clickScroll: true }
+        });
+    }
     if ($.fn.DataTable) {
         $.fn.dataTable.ext.errMode = 'none';
         $('.table:not(.custom-table):not(.no-datatable)').each(function () {
