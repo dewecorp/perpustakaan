@@ -1,5 +1,5 @@
 <?php
 return [
-    'sha' => '49c78e4931ff7cc1f6de4d9b6d47de94508a1f99',
-    'date' => '2026-07-30T12:29:40Z',
+    'sha' => '40d957b09f8c8f759e3d1a8d87e69af1fbe6fc6a',
+    'date' => '2026-09-28T03:30:37Z',
 ];

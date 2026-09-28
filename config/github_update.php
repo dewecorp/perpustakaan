@@ -329,7 +329,7 @@ function check_github_update(bool $force = false): array
             $installed,
             github_build_latest_from_cache($cachedLatestFull),
             $checkedAt ?: null,
-            'Menggunakan data cache. GitHub API sementara tidak dapat diakses.'
+            'Menggunakan data cache. Server pembaruan sementara tidak dapat diakses.'
         );
     }
 
@@ -338,6 +338,6 @@ function check_github_update(bool $force = false): array
         'installed_sha' => $installedShort,
         'latest' => null,
         'checked_at' => $checkedAt ?: null,
-        'error' => 'Tidak dapat memeriksa pembaruan dari GitHub.',
+        'error' => 'Tidak dapat memeriksa pembaruan sistem.',
     ];
 }

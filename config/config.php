@@ -381,6 +381,7 @@ function activity_timeline_meta(string $action_type): array {
  */
 function format_activity_description(array $log): string {
     $desc = trim((string)($log['description'] ?? ''));
+    $desc = str_replace(' dari GitHub', '', $desc);
     $actor = activity_user_label(
         isset($log['user_id']) ? (int)$log['user_id'] : null,
         $log['username'] ?? null

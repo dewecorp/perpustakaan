@@ -1,5 +1,5 @@
 -- Backup Perpustakaan
--- Date: 2026-09-28 10:27:13
+-- Date: 2026-09-28 10:52:35
 
 SET FOREIGN_KEY_CHECKS=0;
 
@@ -14,11 +14,13 @@ CREATE TABLE `activity_logs` (
   `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_created_at` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=104 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Dumping data for table `activity_logs`
 INSERT INTO `activity_logs` VALUES ('100', '1', 'admin', 'login', 'Admin berhasil masuk ke sistem', '2026-09-28 10:05:36');
 INSERT INTO `activity_logs` VALUES ('101', '1', 'admin', 'update', 'Admin memperbarui sistem dari GitHub', '2026-09-28 10:06:24');
+INSERT INTO `activity_logs` VALUES ('102', '1', 'admin', 'update', 'Admin memperbarui sistem dari GitHub', '2026-09-28 10:31:19');
+INSERT INTO `activity_logs` VALUES ('103', '1', 'admin', 'update', 'Admin memperbarui sistem dari GitHub', '2026-09-28 10:52:20');
 
 -- Table structure for table `books`
 DROP TABLE IF EXISTS `books`;
@@ -395,15 +397,15 @@ CREATE TABLE `settings` (
 
 -- Dumping data for table `settings`
 INSERT INTO `settings` VALUES ('footer_description', 'Platform literasi digital MI Sultan Fattah Jepara untuk mengakses koleksi buku kapan saja, di mana saja.');
-INSERT INTO `settings` VALUES ('github_latest_commit_date', '2026-07-30T12:29:40Z');
-INSERT INTO `settings` VALUES ('github_latest_commit_message', 'update pengunjung');
-INSERT INTO `settings` VALUES ('github_latest_commit_sha', '49c78e4931ff7cc1f6de4d9b6d47de94508a1f99');
-INSERT INTO `settings` VALUES ('github_update_checked_at', '1790566030');
+INSERT INTO `settings` VALUES ('github_latest_commit_date', '2026-09-28T03:30:37Z');
+INSERT INTO `settings` VALUES ('github_latest_commit_message', 'update backup');
+INSERT INTO `settings` VALUES ('github_latest_commit_sha', '40d957b09f8c8f759e3d1a8d87e69af1fbe6fc6a');
+INSERT INTO `settings` VALUES ('github_update_checked_at', '1790567551');
 INSERT INTO `settings` VALUES ('github_update_has_update', '0');
 INSERT INTO `settings` VALUES ('hero_description', '<h3>Akses koleksi buku digital perpustakaan kami dengan mudah. Mulai petualangan literasimu hari ini.</h3>');
 INSERT INTO `settings` VALUES ('hero_title', 'Temukan Buku Favoritmu');
-INSERT INTO `settings` VALUES ('installed_commit_date', '2026-07-30T12:29:40Z');
-INSERT INTO `settings` VALUES ('installed_commit_sha', '49c78e4931ff7cc1f6de4d9b6d47de94508a1f99');
+INSERT INTO `settings` VALUES ('installed_commit_date', '2026-09-28T03:30:37Z');
+INSERT INTO `settings` VALUES ('installed_commit_sha', '40d957b09f8c8f759e3d1a8d87e69af1fbe6fc6a');
 INSERT INTO `settings` VALUES ('school_name', 'MI Sultan Fattah Jepara');
 
 -- Table structure for table `users`

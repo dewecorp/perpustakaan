@@ -68,7 +68,7 @@ $(document).on('click', '#btnUpdateSystem, #btnUpdateFromNotif', function(e) {
         var stepTimer;
         var startTime = Date.now();
         var steps = [
-            { text: 'Mengunduh paket dari GitHub...', pct: 20 },
+            { text: 'Mengunduh paket pembaruan...', pct: 20 },
             { text: 'Mengekstrak file update...', pct: 45 },
             { text: 'Menerapkan pembaruan sistem...', pct: 70 },
             { text: 'Menyelesaikan proses update...', pct: 90 }
@@ -209,7 +209,7 @@ $(document).ready(function() {
 <?php $latestUpdateSha = (string)($githubUpdate['latest']['sha_full'] ?? ''); ?>
 Swal.fire({
     title: 'Pembaruan Sistem Tersedia!',
-    html: 'Versi terbaru <strong><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? ''); ?></strong> tersedia di GitHub.<br>Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.',
+    html: 'Versi terbaru <strong><?php echo htmlspecialchars($githubUpdate['latest']['sha'] ?? ''); ?></strong> tersedia.<br>Perbarui sekarang untuk mendapatkan fitur dan perbaikan terbaru.',
     icon: 'info',
     showCancelButton: true,
     confirmButtonText: 'Update Sekarang',

@@ -24,6 +24,6 @@ echo json_encode([
     'latest' => $result['latest'],
     'checked_at' => $result['checked_at'],
     'message' => $result['error'] ?? ($result['has_update']
-        ? 'Pembaruan baru tersedia di GitHub.'
+        ? 'Pembaruan baru tersedia.'
         : 'Sistem Anda sudah menggunakan versi terbaru.'),
 ]);

@@ -235,12 +235,12 @@ try {
         throw new RuntimeException('Tidak ada file yang diperbarui.');
     }
 
-    log_activity('update', activity_user_label() . ' memperbarui sistem dari GitHub');
+    log_activity('update', activity_user_label() . ' memperbarui sistem');
     mark_github_update_installed();
 
     echo json_encode([
         'success' => true,
-        'message' => 'Sistem berhasil diperbarui dari GitHub. ' . $copied . ' file diperbarui.',
+        'message' => 'Sistem berhasil diperbarui. ' . $copied . ' file diperbarui.',
     ]);
 } catch (Throwable $e) {
     http_response_code(500);
