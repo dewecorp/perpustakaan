@@ -47,6 +47,8 @@ if ($action === 'backup') {
         $filename = 'backup_' . date('Y-m-d_H-i-s') . '.sql';
         file_put_contents($backupDir . $filename, $content);
 
+        log_activity('create', activity_user_label() . ' membuat backup database: ' . $filename);
+
         // Return JSON if AJAX
         if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
             $_SESSION['success'] = "Backup berhasil dibuat";
@@ -99,6 +101,7 @@ if ($action === 'backup') {
                 }
                 
                 $pdo->exec("SET FOREIGN_KEY_CHECKS=1");
+                log_activity('update', activity_user_label() . ' merestore database dari file: ' . $file['name']);
                 $_SESSION['success'] = "Database berhasil direstore";
             } catch (Exception $e) {
                 $_SESSION['error'] = "Gagal restore: " . $e->getMessage();
@@ -114,6 +117,7 @@ if ($action === 'backup') {
     $filename = $_GET['file'] ?? '';
     if ($filename && file_exists($backupDir . $filename)) {
         unlink($backupDir . $filename);
+        log_activity('delete', activity_user_label() . ' menghapus file backup: ' . $filename);
         $_SESSION['success'] = "File backup berhasil dihapus";
     } else {
         $_SESSION['error'] = "File tidak ditemukan";
